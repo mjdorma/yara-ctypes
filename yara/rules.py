@@ -441,6 +441,6 @@ def compile(**kwargs):
 
 
 if __name__ == "__main__":
-    rules = build_namespaced_rules()
+    rules = load_rules()
     matches = rules.match_path(sys.argv[1])
     pprint.pprint(matches)

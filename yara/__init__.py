@@ -8,4 +8,6 @@ from yara.rules import compile
 from yara.rules import load_rules
 from yara.rules import Rules
 from yara.rules import YARA_RULES_ROOT
+from yara.rules import CALLBACK_CONTINUE 
+from yara.rules import CALLBACK_ABORT
 from yara.scan import Scanner

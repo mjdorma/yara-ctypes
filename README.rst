@@ -20,9 +20,9 @@ yara folder:
 
  + scan.py - Command line interface tool for yara scanning files and processes
  + rules.py - Context manager and interface to libyara.py. Also includes a main 
-             to demonstrate how simple it is to build a rules object than scan.
+   to demonstrate how simple it is to build a rules object than scan.
  + ./rules/ - default yar rules path... Demonstrates how to store yar files with
-              the opened 'example' yars and 'hbgary' yars...  
+   the opened 'example' yars and 'hbgary' yars...  
 
 
 test folder:

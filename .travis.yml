@@ -2,7 +2,6 @@ language: python
 python:
   - 2.7
   - 3.2
-  - pypy
 install:
   - pip install -r requirements/testing.txt -r requirements/production.txt --use-mirrors
   - python setup.py install

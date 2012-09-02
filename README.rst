@@ -11,7 +11,7 @@ Why:
  + I found a few bugs and memory leaks and wanted to make my life simple.
 
 
-For tips / tricks with this wrapper contact Mick: mjdorma@gmail.com
+For tips / tricks with this wrapper contact Mick: mjdorma+github@gmail.com
 
 
 WHAT IS INCLUDED

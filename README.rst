@@ -1,54 +1,55 @@
-INTRODUCTION::
+Introduction to yara-ctypes-python
+*******************
+A powerful python wrapper for libyara!!! 
 
-A powerful python wrapper to libyara!!! 
+Why:
 
-Why?  
-
-  + ctypes releases the GIL on system function calls...  Run your PC to its
-    true potential.
-  + No more building the PyC extension...  
-  + I found a few bugs and memory leaks and wanted to make my life simple.
+ + ctypes releases the GIL on system function calls...  Run your PC to its
+   true potential.
+ + No more building the PyC extension...  
+ + I found a few bugs and memory leaks and wanted to make my life simple.
 
 
 For tips / tricks with this wrapper contact Mick: mjdorma@gmail.com
 
- + WHAT IS INCLUDED
- + INSTALL and TEST
- + libyara BUILD NOTES
- + MOD TO YARA 1.6
- + RULES FOLDER
- + PERFORMING A SCAN 
-
-
 
 WHAT IS INCLUDED
+================
+
+yara folder:
+
  + scan.py - Command line interface tool for yara scanning files and processes
  + rules.py - Context manager and interface to libyara.py. Also includes a main 
              to demonstrate how simple it is to build a rules object than scan.
- + libyara_wrapper.py - Wrapper to libyara.so.0.0.0/dll yara-1.6
- + broken_rules.yar - Used in test
- + test_libyara.py / test_yara.py 
- + simple_output.txt - example of some output 
  + ./rules/ - default yar rules path... Demonstrates how to store yar files with
               the opened 'example' yars and 'hbgary' yars...  
 
 
-INSTALL and TEST
+test folder:
 
-    > python setup.py install 
+ + libyara_wrapper.py - Wraps the libyara library file 
+ + test_libyara.py / test_yara.py 
+
+
+libs folder: contains precompiled libyara files (make shipping easier)
+
+
+INSTALL and TEST
+________________
+
+Simply run the following ::
+
+    > python setup.py install
+    > python setup.py test
+    > python -m yara.scan -h
 
 
 If the package does not contain a pre-compiled libyara library for your
-platform you need to build and install it.
-
-Test to see if yara was installed successfully::
-
-    > python test/test_libyara_wrapper.py
-    > python test/test_rules.py
+platform you need to build and install it.  (see libyara BUILD NOTES)
 
 
 libyara BUILD NOTES
-
+___________________
 _A rough build guide - my notes_ 
 
 Ubuntu pre-requisites:: 
@@ -81,53 +82,55 @@ Note::
        Windows:
           <python install dir>\DLLs   (or sys.prefix + 'DLLs')
        Linux:
-          /usr/lib    (or sys.prefix + 'lib'
+          <python env usr root>/lib    (or sys.prefix + 'lib'
        
-    2. Make sure the libraries were built for target python platform (64 vs 32)
+    2. Make sure the libraries were built for the target platform (64 vs 32)
        import platform
        print platform.architecture() 
 
 
-
 MOD TO YARA 1.6
+_______________
 
-modification of libyara (yara-1.6) to allow cleanup of search results::
-```
-   >>>yara.h<<<
-   + void yr_free_matches(YARA_CONTEXT* context);
-   >>>libyara.c<<<       
-   + void yr_free_matches(YARA_CONTEXT* context)
-   + {
-   +    RULE* rule;
-   +    STRING* string;
-   +    MATCH* match;
-   +    MATCH* next_match;
-   +    rule = context->rule_list.head;
-   +    while (rule != NULL)
-   +    {        
-   +        string = rule->string_list_head;
-   +        
-   +        while (string != NULL)
-   +        {
-   +            match = string->matches_head;
-   +            while (match != NULL)
-   +            {
-   +                next_match = match->next;
-   +                yr_free(match->data);
-   +                yr_free(match);
-   +                match = next_match;
-   +            }
-   +            string->matches_head = NULL;
-   +            string->matches_tail = NULL;
-   +            string = string->next;
-   +        }
-   +        rule = rule->next;
-   +    }
-   + }
-```
+See: http://yara-project.googlecode.com/svn/tags/yara-1.6.0
+
+Modification of libyara (yara-1.6) to allow cleanup of search results::
+
+    >>>yara.h<<<
+    + void yr_free_matches(YARA_CONTEXT* context);
+    >>>libyara.c<<<       
+    + void yr_free_matches(YARA_CONTEXT* context)
+    + {
+    +    RULE* rule;
+    +    STRING* string;
+    +    MATCH* match;
+    +    MATCH* next_match;
+    +    rule = context->rule_list.head;
+    +    while (rule != NULL)
+    +    {        
+    +        string = rule->string_list_head;
+    +        
+    +        while (string != NULL)
+    +        {
+    +            match = string->matches_head;
+    +            while (match != NULL)
+    +            {
+    +                next_match = match->next;
+    +                yr_free(match->data);
+    +                yr_free(match);
+    +                match = next_match;
+    +            }
+    +            string->matches_head = NULL;
+    +            string->matches_tail = NULL;
+    +            string = string->next;
+    +        }
+    +        rule = rule->next;
+    +    }
+    + }
+
 
 RULES FOLDER
-
+____________
 Example rules folder::
 
     ./rules/hbgary/libs.yar
@@ -155,9 +158,8 @@ Example rules folder::
     example.packer_rules
 
 
-
 PERFORMING A SCAN
-
+_________________
 
 Simply kick off the scan module as main with -h to see how to run a scan::
 

@@ -276,7 +276,7 @@ Continuous integration testing is provided by `Travis CI <http://travis-ci.org/>
 Issues
 ======
 
-Source code for *prefixtree* is hosted on `GitHub <https://github.com/mjdorma/yara-ctypes>`_. 
+Source code for *yara-ctypes* is hosted on `GitHub <https://github.com/mjdorma/yara-ctypes>`_. 
 Please file `bug reports <https://github.com/mjdorma/yara-ctypes/issues>`_
 with GitHub's issues system.
 

@@ -11,7 +11,10 @@ Why:
 * I found a few bugs and memory leaks and wanted to make my life simple.
 
 
-For tips / tricks with this wrapper contact Mick: mjdorma+yara-ctypes@gmail.com
+For tips / tricks with this wrapper feel free to post a question 
+`here <https://github.com/mjdorma/yara-ctypes/issues>`_. 
+
+[mjdorma+yara-ctypes@gmail.com]
 
 
 What is included
@@ -264,7 +267,6 @@ Windows 7:
 
  + CPython 2.6 (32bit)
  + CPython 3.2 (32bit)
-
 
 
 

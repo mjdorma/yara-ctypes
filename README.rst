@@ -5,16 +5,16 @@ A powerful python wrapper for `libyara <http://code.google.com/p/yara-project>`_
 
 Why:
 
- * ctypes releases the GIL on system function calls...  Run your PC to its
-   true potential.
- * No more building the PyC extension...  
- * I found a few bugs and memory leaks and wanted to make my life simple.
+* ctypes releases the GIL on system function calls...  Run your PC to its
+  true potential.
+* No more building the PyC extension...  
+* I found a few bugs and memory leaks and wanted to make my life simple.
 
 
 For tips / tricks with this wrapper contact Mick: mjdorma+yara-ctypes@gmail.com
 
 
-WHAT IS INCLUDED
+What is included
 ================
 
 yara folder:
@@ -35,7 +35,7 @@ test folder:
 libs folder: contains precompiled libyara files (make shipping easier)
 
 
-INSTALL and TEST
+Install and test
 ================
 
 Simply run the following::
@@ -46,10 +46,10 @@ Simply run the following::
 
 
 If the package does not contain a pre-compiled libyara library for your
-platform you need to build and install it.  (see libyara BUILD NOTES)
+platform you need to build and install it.  (see libyara build notes)
 
 
-libyara BUILD NOTES
+libyara build notes
 ===================
 
 *A rough build guide - my notes*
@@ -91,7 +91,7 @@ Note::
        print platform.architecture() 
 
 
-MOD TO YARA 1.6
+Mod to yara-1.6
 ===============
 
 See: http://yara-project.googlecode.com/svn/tags/yara-1.6.0
@@ -131,7 +131,7 @@ Modification of libyara (yara-1.6) to allow cleanup of search results::
     + }
 
 
-RULES FOLDER
+Rules Folder
 ============
 
 Example rules folder::
@@ -161,7 +161,7 @@ Example rules folder::
     example.packer_rules
 
 
-PERFORMING A SCAN
+Performing a scan
 =================
 
 Simply kick off the scan module as main with -h to see how to run a scan::
@@ -241,8 +241,9 @@ Scan files::
 
     -rw-rw-r-- 1 mick mick 17M Sep  1 17:37 result.out
 
+
 Compatability
--------------
+=============
 
 *yara-ctypes* is implemented to be compatible with Python 2.6+ and Python 3.x. It
 has been tested against the following Python implementations:
@@ -271,7 +272,7 @@ Continuous integration testing is provided by `Travis CI <http://travis-ci.org/>
 
 
 Issues
-------
+======
 
 Source code for *prefixtree* is hosted on `GitHub <https://github.com/mjdorma/yara-ctypes>`_. 
 Please file `bug reports <https://github.com/mjdorma/yara-ctypes/issues>`_

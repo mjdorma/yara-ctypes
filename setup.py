@@ -47,7 +47,7 @@ if libs:
     data_files.append((libdir, libs))
 else:
     print("WARNING: No libs found at %s" % libspath)
-    print(" You need to 'make install' libyara (yara-1.6) for this platform")
+    print("You need to 'make install' libyara (yara-1.6) for this platform")
 
 setup(
     name="yara",

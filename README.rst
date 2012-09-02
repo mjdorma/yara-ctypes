@@ -1,6 +1,7 @@
 Introduction to yara-ctypes-python
-*******************
-A powerful python wrapper for libyara!!! 
+**********************************
+
+A powerful python wrapper for `libyara <http://code.google.com/p/yara-project>`_.
 
 Why:
 
@@ -35,9 +36,9 @@ libs folder: contains precompiled libyara files (make shipping easier)
 
 
 INSTALL and TEST
-________________
+================
 
-Simply run the following ::
+Simply run the following::
 
     > python setup.py install
     > python setup.py test
@@ -49,8 +50,9 @@ platform you need to build and install it.  (see libyara BUILD NOTES)
 
 
 libyara BUILD NOTES
-___________________
-_A rough build guide - my notes_ 
+===================
+
+*A rough build guide - my notes*
 
 Ubuntu pre-requisites:: 
 
@@ -90,7 +92,7 @@ Note::
 
 
 MOD TO YARA 1.6
-_______________
+===============
 
 See: http://yara-project.googlecode.com/svn/tags/yara-1.6.0
 
@@ -130,7 +132,8 @@ Modification of libyara (yara-1.6) to allow cleanup of search results::
 
 
 RULES FOLDER
-____________
+============
+
 Example rules folder::
 
     ./rules/hbgary/libs.yar
@@ -159,7 +162,7 @@ Example rules folder::
 
 
 PERFORMING A SCAN
-_________________
+=================
 
 Simply kick off the scan module as main with -h to see how to run a scan::
 

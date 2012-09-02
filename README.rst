@@ -253,7 +253,7 @@ Ubuntu 12.04:
  + CPython 2.7 (32bit, 64bit)
  + CPython 3.2 (64bit)
 
-Ubuntu 11.10 *Travis CI tests*:
+Ubuntu 11.10 |build_status|:
 
  + CPython 2.6 (32bit)
  + CPython 2.7 (32bit)
@@ -266,7 +266,7 @@ Windows 7:
  + CPython 3.2 (32bit)
 
 
-|build_status|
+
 
 Continuous integration testing is provided by `Travis CI <http://travis-ci.org/>`_.
 

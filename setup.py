@@ -60,7 +60,7 @@ setup(
     author_email="mjdorma@gmail.com",
     url="http://code.google.com/p/yara-project/",
     description="Compile YARA rules to test against files or strings",
-    long_description=open('README').read(),
+    long_description=open('README.rst').read(),
     license="ASL",
     install_requires=[],
     classifiers=[

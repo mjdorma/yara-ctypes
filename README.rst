@@ -248,16 +248,19 @@ Compatability
 has been tested against the following Python implementations:
 
 Ubuntu 12.04:
+
 * CPython 2.7 (32bit, 64bit)
 * CPython 3.2 (64bit)
 
 Ubuntu 11.10 *Travis CI tests*:
+
 * CPython 2.6 (32bit)
 * CPython 2.7 (32bit)
 * CPython 3.2 (32bit)
 * PyPy 1.9.0 (32bit)
 
 Windows 7:
+
 * CPython 2.6 (32bit)
 * CPython 3.2 (32bit)
 

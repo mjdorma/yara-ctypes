@@ -2,10 +2,12 @@ INTRODUCTION::
 
 A powerful python wrapper to libyara!!! 
 
-Why?  + ctypes releases the GIL on system function calls...  Run your PC to its
-        true potential.
-      + No more building the PyC extension...  
-      + I found a few bugs and memory leaks and wanted to make my life simple.
+Why?  
+
+  + ctypes releases the GIL on system function calls...  Run your PC to its
+    true potential.
+  + No more building the PyC extension...  
+  + I found a few bugs and memory leaks and wanted to make my life simple.
 
 
 For tips / tricks with this wrapper contact Mick: mjdorma@gmail.com
@@ -32,15 +34,17 @@ WHAT IS INCLUDED
 
 
 INSTALL and TEST
- > python setup.py install 
+
+    > python setup.py install 
+
 
 If the package does not contain a pre-compiled libyara library for your
 platform you need to build and install it.
 
-Test to see if yara was installed successfully  
- > python test/test_libyara_wrapper.py
- > python test/test_rules.py
+Test to see if yara was installed successfully::
 
+    > python test/test_libyara_wrapper.py
+    > python test/test_rules.py
 
 
 libyara BUILD NOTES
@@ -48,27 +52,31 @@ libyara BUILD NOTES
 _A rough build guide - my notes_ 
 
 Ubuntu pre-requisites:: 
-        > sudo apt-get install flex libpcre3-dev pcre bison
-        > cd $ROOTDIR/yara-1.6/
-        > aclocal
-        > automake -ac
-        > autoheader
-        > autoconf
-        > ./configure 
-        make install 
+
+    > sudo apt-get install flex libpcre3-dev pcre bison
+    > cd $ROOTDIR/yara-1.6/
+    > aclocal
+    > automake -ac
+    > autoheader
+    > autoconf
+    > ./configure 
+    make install 
+
 
 Windows pre-requisites::
-        > install mingw32 
-        > pcre-8.20 builds fine...  ./configure && make install
-        > autoreconf -fiv # force an autoreconf (or update/replace libtools m4) 
-        > install build auto tools (including autoconf autogen)
-        > find the latest pcre and bison - build them! :P
-        > cd $ROOTDIR/yara-1.6/
-        > ./configure
-        > make install 
+
+    > install mingw32 
+    > pcre-8.20 builds fine...  ./configure && make install
+    > autoreconf -fiv # force an autoreconf (or update/replace libtools m4) 
+    > install build auto tools (including autoconf autogen)
+    > find the latest pcre and bison - build them! :P
+    > cd $ROOTDIR/yara-1.6/
+    > ./configure
+    > make install 
 
 
 Note:: 
+
     1. Make sure the libyara.so or libyara-0.dll can be found! 
        Windows:
           <python install dir>\DLLs   (or sys.prefix + 'DLLs')
@@ -84,10 +92,10 @@ Note::
 MOD TO YARA 1.6
 
 modification of libyara (yara-1.6) to allow cleanup of search results::
-
-  >>>yara.h<<<
+```
+   >>>yara.h<<<
    + void yr_free_matches(YARA_CONTEXT* context);
-  >>>libyara.c<<<       
+   >>>libyara.c<<<       
    + void yr_free_matches(YARA_CONTEXT* context)
    + {
    +    RULE* rule;
@@ -116,8 +124,7 @@ modification of libyara (yara-1.6) to allow cleanup of search results::
    +        rule = rule->next;
    +    }
    + }
-
-
+```
 
 RULES FOLDER
 

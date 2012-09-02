@@ -5,10 +5,10 @@ A powerful python wrapper for `libyara <http://code.google.com/p/yara-project>`_
 
 Why:
 
- + ctypes releases the GIL on system function calls...  Run your PC to its
+ * ctypes releases the GIL on system function calls...  Run your PC to its
    true potential.
- + No more building the PyC extension...  
- + I found a few bugs and memory leaks and wanted to make my life simple.
+ * No more building the PyC extension...  
+ * I found a few bugs and memory leaks and wanted to make my life simple.
 
 
 For tips / tricks with this wrapper contact Mick: mjdorma+yara-ctypes@gmail.com
@@ -249,20 +249,20 @@ has been tested against the following Python implementations:
 
 Ubuntu 12.04:
 
-* CPython 2.7 (32bit, 64bit)
-* CPython 3.2 (64bit)
+ + CPython 2.7 (32bit, 64bit)
+ + CPython 3.2 (64bit)
 
 Ubuntu 11.10 *Travis CI tests*:
 
-* CPython 2.6 (32bit)
-* CPython 2.7 (32bit)
-* CPython 3.2 (32bit)
-* PyPy 1.9.0 (32bit)
+ + CPython 2.6 (32bit)
+ + CPython 2.7 (32bit)
+ + CPython 3.2 (32bit)
+ + PyPy 1.9.0 (32bit)
 
 Windows 7:
 
-* CPython 2.6 (32bit)
-* CPython 3.2 (32bit)
+ + CPython 2.6 (32bit)
+ + CPython 3.2 (32bit)
 
 
 |build_status|

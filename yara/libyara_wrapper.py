@@ -290,15 +290,20 @@ YARA_CONTEXT._fields_ = [
 
 #Import libyara
 if sys.platform == 'win32':
-    library = 'libyara-0.dll'
     dllpath = os.path.join(sys.prefix, 'DLLs')
+    library = os.path.join(dllpath, 'libyara-0.dll')
 else:
-    library = 'libyara.so'
     dllpath = os.path.join(sys.prefix, 'lib')
+    library = os.path.join(dllpath, 'libyara.so')
 
 tmp = os.environ['PATH']
 os.environ['PATH'] += ";%s" % dllpath
-libyaradll = cdll.LoadLibrary(library)
+try:
+    libyaradll = cdll.LoadLibrary(os.path.join(dllpath, library))
+except Exception as err:
+    print("Failed to import '%s'" % library)
+    print("PATH = %s" % os.environ['PATH'])
+    raise
 os.environ['PATH'] = tmp
 
 

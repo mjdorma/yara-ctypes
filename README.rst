@@ -149,8 +149,8 @@ Example rules folder::
     ./rules/hbgary/antidebug.yar
     ./rules/example/packer_rules.yar
 
- Building a Rules object using yara.load_rules load all of
- the above yar files into the following namespaces:: 
+ Building a Rules object using yara.load_rules() will load all
+ of the above yar files into the following namespaces:: 
 
     hbgary.libs
     hbgary.compression

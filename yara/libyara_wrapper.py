@@ -299,7 +299,7 @@ else:
 tmp = os.environ['PATH']
 os.environ['PATH'] += ";%s" % dllpath
 try:
-    libyaradll = cdll.LoadLibrary(os.path.join(dllpath, library))
+    libyaradll = cdll.LoadLibrary(library)
 except Exception as err:
     print("Failed to import '%s'" % library)
     print("PATH = %s" % os.environ['PATH'])

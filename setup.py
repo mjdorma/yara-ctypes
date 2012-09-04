@@ -77,7 +77,7 @@ setup(
         'Programming Language :: Python :: 3.2',
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: Implementation :: CPython',
-        'Topic :: Security'
+        'Topic :: Security',
         'Topic :: System :: Monitoring'
     ],
     test_suite="tests"

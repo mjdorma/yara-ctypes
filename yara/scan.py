@@ -27,21 +27,28 @@ DEFAULT_THREAD_POOL = 4
 
 
 class Scanner:
-    """Scan pids or paths...
-        return results through an iteration sequence
+    """Scan process IDs or file paths.
+        
+    Returns results as they become available through an iteration sequence::
+
+        # Recursively scan all the paths from '.'
+        for path, result in Scanner(paths=['.']):
+            print("%s : %s" % (path, result))
     """
     def __init__(self, pids=[], paths=[],
                        rules_rootpath=yara.YARA_RULES_ROOT,
                        whitelist=[],
                        blacklist=[],
                        thread_pool=DEFAULT_THREAD_POOL):
-        """
-        pids - list of process ids to scan (not tested)
-        paths - list of paths to scan
-        rules_rootpath - path to the root of the rules directory
-        whitelist - whitelist of rules to use in scanner
-        blacklist - blacklist of rules to not use in scanner
-        thread_pool - number of threads to use in scanner
+        """yara scanner class.
+
+        kwargs:
+            pids - list of process ids to scan
+            paths - list of paths to scan
+            rules_rootpath - path to the root of the rules directory
+            whitelist - whitelist of rules to use in scanner
+            blacklist - blacklist of rules to not use in scanner
+            thread_pool - number of threads to use in scanner
         """
         self._rules = yara.load_rules(rules_rootpath=rules_rootpath,
                                       blacklist=blacklist,

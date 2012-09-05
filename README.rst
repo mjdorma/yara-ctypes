@@ -83,7 +83,7 @@ Windows pre-requisites::
 
 Note:: 
 
-    1. Make sure the libyara.so or libyara-0.dll can be found! 
+    1. Make sure the libyara.so or libyara.dll can be found! 
        Windows:
           <python install dir>\DLLs   (or sys.prefix + 'DLLs')
        Linux:

@@ -5,7 +5,7 @@ import ctypes
 from ctypes import *
 
 """
-A ctypes wrapper to libyara-0.dll or libyara.so version 1.6
+A ctypes wrapper to libyara.dll or libyara.so version 1.6
 
 Note: read the ctypes wrapper README to see details on how to extend
       yara-1.6 to free matched results after each scan...
@@ -291,7 +291,7 @@ YARA_CONTEXT._fields_ = [
 #Import libyara
 if sys.platform == 'win32':
     dllpath = os.path.join(sys.prefix, 'DLLs')
-    library = os.path.join(dllpath, 'libyara-0.dll')
+    library = os.path.join(dllpath, 'libyara.dll')
 else:
     dllpath = os.path.join(sys.prefix, 'lib')
     library = os.path.join(dllpath, 'libyara.so')

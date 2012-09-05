@@ -1,0 +1,7 @@
+include *.rst
+include distribute_setup.py
+recursive-include tests *.py
+recursive-include tests *.yar
+recursive-include yara/rules *.yar
+recursive-include libs *.so
+recursive-include libs *.dll

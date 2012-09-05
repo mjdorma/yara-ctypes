@@ -105,7 +105,7 @@ class TestYaraCompile(unittest.TestCase):
     """ """
     def setUp(self):
         self.target = os.path.join(os.path.split(__file__)[0], '..', 'libs',
-                       'WindowsPE', '32bit', 'libyara-0.dll')
+                       'WindowsPE', '32bit', 'libyara.dll')
 
     def test_compile_filepath(self):
         """compile filepath"""
@@ -156,7 +156,7 @@ class TestYaraBuildnameSpacedRules(unittest.TestCase):
     """ """
     def setUp(self):
         self.target = os.path.join(os.path.split(__file__)[0], '..', 'libs',
-                        'WindowsPE', '32bit', 'libyara-0.dll')
+                        'WindowsPE', '32bit', 'libyara.dll')
 
     def test_default_load(self):
         """build ns rules - default load"""

@@ -61,8 +61,9 @@ setup(
     url="http://code.google.com/p/yara-project/",
     description="Compile YARA rules to test against files or strings",
     long_description=open('README.rst').read(),
-    license="ASL",
-    install_requires=[],
+    license="Apache Software Licence",
+    install_requires = [],
+    platforms=['cygwin', 'win', 'linux'],
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
         'Intended Audience :: Other Audience',

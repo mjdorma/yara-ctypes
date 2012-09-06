@@ -21,32 +21,6 @@ For additional tips / tricks with this wrapper feel free to post a question
 [mjdorma+yara-ctypes@gmail.com]
 
 
-
-What is included
-================
-
-yara folder:
-
- + scan.py - Command line interface tool for yara scanning files and processes
- + rules.py - Context manager and interface to libyara.py. Also includes a main 
-   to demonstrate how simple it is to build a rules object than scan.
- + libyara_wrapper.py - Wraps the libyara library file 
- + ./rules/ - default yar rules path... Demonstrates how to store yar files with
-   the opened 'example' yars and 'hbgary' yars...  
-
-
-test folder:
-
- + test_libyara.py 
- + test_yara.py 
- + test_scanner.py
-
-
-libs folder: 
- + WindowsPE / (64bit and 32bit) / libyara.dll
- + ELF / (64bit and 32bit) / libyara.so
-
-
 Install and run
 ===============
 

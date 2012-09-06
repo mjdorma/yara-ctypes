@@ -11,7 +11,7 @@ Why:
 * I found a few bugs and memory leaks and wanted to make my life simple.
 
 
-See `yara doc`_ as a reference and guide to yara-ctypes.
+As a reference and guide to yara-ctypes see: `yara-ctypes doc`_
 
 
 For additional tips / tricks with this wrapper feel free to post a question 
@@ -78,7 +78,7 @@ with GitHub's issues system.
 
 
 
-.. _yara doc: http://packages.python.org/yara/
+.. _yara-ctypes doc: http://packages.python.org/yara/
 .. _libyara: http://code.google.com/p/yara-project
 .. |build_status| image:: https://secure.travis-ci.org/mjdorma/yara-ctypes.png?branch=master
    :target: http://travis-ci.org/#!/mjorma/yara-ctypes

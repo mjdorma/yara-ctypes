@@ -41,7 +41,7 @@ Simply run the following::
     > python setup.py test
     > python -m yara.scan -h
 
-or *`PyPi`_*:: 
+or `PyPi`_:: 
 
     > pip install yara
     > python -m yara.scan -h

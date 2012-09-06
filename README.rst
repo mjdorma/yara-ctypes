@@ -1,7 +1,15 @@
 Introduction to yara-ctypes-python
 **********************************
 
-A powerful python wrapper for `libyara`_.
+What is yara-ctypes:
+
+ * A powerful python wrapper for `yara-project's libyara v1.6`_.
+ * Supports thread safe matching of YARA rules.
+ * namespace management to allow easy loading of multiple YARA rules into a
+   single libyara context. 
+ * Comes with a scan module which exposes a user CLI and demonstrates a pattern
+   for executing match jobs across a thread pool.
+
 
 Why:
 
@@ -11,11 +19,14 @@ Why:
 * I found a few bugs and memory leaks and wanted to make my life simple.
 
 
-As a reference and guide to yara-ctypes see: `yara-ctypes doc`_
+As a reference and guide to yara-ctypes see: `yara-ctypes documentation`_
 
 
-For additional tips / tricks with this wrapper feel free to post a question 
-`here <https://github.com/mjdorma/yara-ctypes/issues>`_. 
+For additional tips / tricks with this wrapper feel free to post a question at 
+the github `yara-ctypes/issues`_ page. 
+
+
+Project hosting provided by `github.com`_.
 
 
 [mjdorma+yara-ctypes@gmail.com]
@@ -30,7 +41,7 @@ Simply run the following::
     > python setup.py test
     > python -m yara.scan -h
 
-or::
+or *`PyPi`_*:: 
 
     > pip install yara
     > python -m yara.scan -h
@@ -39,14 +50,14 @@ or::
 .. note::
 
     If the package does not contain a pre-compiled libyara library for your
-    platform you need to build and install it.  (see libyara build notes)
+    platform you will need to build and install it. See `notes on building`_.
 
 
 Compatability
 =============
 
-*yara-ctypes* is implemented to be compatible with Python 2.6+ and Python 3.x. It
-has been tested against the following Python implementations:
+*yara-ctypes* is implemented to be compatible with Python 2.6+ and Python 3.x.
+It has been tested against the following Python implementations:
 
 Ubuntu 12.04:
 
@@ -77,8 +88,26 @@ Please file `bug reports <https://github.com/mjdorma/yara-ctypes/issues>`_
 with GitHub's issues system.
 
 
+Change log
+==========
 
-.. _yara-ctypes doc: http://packages.python.org/yara/
-.. _libyara: http://code.google.com/p/yara-project
+version 1.6.0 (01/09/2012)
+
+ * Initial release
+
+version 1.6.1 (06/09/2012)
+
+ * Support for 64bit Windows
+ * Bug fixes 
+ * Added documentation
+
+
+
+.. _github.com: https://github.com/mjdorma/yara-ctypes
+.. _PyPi: http://pypi.python.org/pypi/yara
+.. _yara-ctypes/issues: https://github.com/mjdorma/yara-ctypes/issues
+.. _notes on building: http://packages.python.org/yara/howto/build.html
+.. _yara-ctypes documentation: http://packages.python.org/yara/
+.. _yara-project's libyara v1.6: http://code.google.com/p/yara-project
 .. |build_status| image:: https://secure.travis-ci.org/mjdorma/yara-ctypes.png?branch=master
    :target: http://travis-ci.org/#!/mjorma/yara-ctypes

@@ -1,37 +1,160 @@
-How to scan using python -m yara.scan
-=====================================
+Tutorial on using :mod:`yara.scan`
+==================================
 
-Once yara-ctypes is installed in your Python environment you can instantly
-begin scanning files or processes through the :mod:`yara.scan` CLI. 
+This page should contain all of the information required to successfully
+utilise :mod:`yara.scan` as a system scanning utility.
 
 
-Introduction to YARA rules files
---------------------------------
+Executing :mod:`yara.scan`
+--------------------------
 
-The default yara-ctypes package ships with some sample rules which, depending
-on your purpose may not be very useful.
+Once yara-ctypes is installed into your Python environment you can simply kick
+off the scan module as with -h to see how to run a scan::
+
+    $ python -m yara.scan -h
+
+
+Performing a scan
+-----------------
+
+*List available modules*::
+
+    $ python -m yara.scan --list
+
+    Rules + hbgary.compiler
+          + example.packer_rules
+          + hbgary.sockets
+          + hbgary.libs
+          + hbgary.compression
+          + hbgary.fingerprint
+          + hbgary.integerparsing
+          + hbgary.antidebug
+          + hbgary.microsoft
+
+    $ python -m yara.scan --list --whitelist=hbgary
+
+    Rules + hbgary.compiler
+          + hbgary.sockets
+          + hbgary.libs
+          + hbgary.compression
+          + hbgary.fingerprint
+          + hbgary.integerparsing
+          + hbgary.antidebug
+          + hbgary.microsoft
+
+
+*Scan process memory*::
+
+    $ ps 
+      PID TTY          TIME CMD
+     6975 pts/7    00:00:05 bash
+    13479 pts/7    00:00:00 ps
+
+    $ sudo python -m yara.scan --proc 6975 > result.out
+    
+    Rules + hbgary.compiler
+          + example.packer_rules
+          + hbgary.sockets
+          + hbgary.libs
+          + hbgary.compression
+          + hbgary.fingerprint
+          + hbgary.integerparsing
+          + hbgary.antidebug
+          + hbgary.microsoft
+    scan queue: 0       result queue: 0      
+    scanned 1 items... done.
+
+    $ ls -lah result.out 
+
+    -rw-rw-r-- 1 mick mick 222K Sep  1 17:36 result.out
+
+
+*Scan a file*::
+
+    $ sudo python -m yara.scan /usr/bin/ > result.out
+
+    Rules + hbgary.compiler
+          + example.packer_rules
+          + hbgary.sockets
+          + hbgary.libs
+          + hbgary.compression
+          + hbgary.fingerprint
+          + hbgary.integerparsing
+          + hbgary.antidebug
+          + hbgary.microsoft
+    scan queue: 0       result queue: 0      
+    scanned 1518 items... done.
+
+    > ls -lah result.out 
+
+    -rw-rw-r-- 1 mick mick 17M Sep  1 17:37 result.out
+
+
+
+YARA rules files and folder
+---------------------------
+
+If you are not familiar with YARA rules files visit `yara project`_ to learn
+more.
+
 
 To make life simple the :mod:`yara.rules` module supports filtered namespaced
 loading of multiple YARA rules files into a single context.  This is managed
 through a translation of folder names and file names into '.' seperated names.
-The root of this folder structured is defined as the YARA_RULES root path.
-
-The YARA_RULES root path defaults to the install path of
-```os.path.dirname(:mod:`yara.rules`.__file__) + '/rules'```.  This can be over
-written by either setting the YARA_RULES environment variable or passing in
-the --root=[PATH] directive through the command line. 
+The root of this folder structured is defined by the YARA_RULES path.
 
 
-Visit _yara-project for details on how to define YARA rules files.
+By default the YARA_RULES path points to the following path::
+
+    os.path.dirname(:mod:`yara.rules`.__file__) + '/rules'
 
 
-Example on managing YARA rules files
-------------------------------------
+Included rules folder
+---------------------
 
-In this demo we have defined a bunch of process specific rules and file
-specific rules.  
+The rules folder shipped with yara-ctypes helps with testing and works as a
+good example set of YARA rules for people to get started from. 
 
-This is what our YARA_RULES namespaced file structure looks like::
+Packaged rules folder::
+
+    ./rules/hbgary/libs.yar
+    ./rules/hbgary/compression.yar
+    ./rules/hbgary/fingerprint.yar
+    ./rules/hbgary/microsoft.yar
+    ./rules/hbgary/sockets.yar
+    ./rules/hbgary/integerparsing.yar
+    ./rules/hbgary/compiler.yar
+    ./rules/hbgary/antidebug.yar
+    ./rules/example/packer_rules.yar
+
+
+Building a Rules object using ``yara.load_rules()`` will load all
+of the above yar files into the following namespaces:: 
+
+    hbgary.libs
+    hbgary.compression
+    hbgary.fingerprint
+    hbgary.microsoft
+    hbgary.sockets
+    hbgary.integerparsing
+    hbgary.compiler
+    hbgary.antidebug
+    example.packer_rules
+
+
+Using yara-ctypes rules folders
+-------------------------------
+
+This section will walk you through defining and loading a realistic rules
+folder.  
+
+
+*A practical rules folder example:*
+
+We set out by defining two sub directories, one for our process memory
+specific signatures and the other for our file signatures.  
+
+Here is what it looks like::
 
     ~/rules/
         pid/loggers.yar
@@ -40,10 +163,16 @@ This is what our YARA_RULES namespaced file structure looks like::
         file/loggers.yar
         file/spammers.yar
         file/infectors.yar
-    
-So :mod:`yara.scan` can access our rules, we need to set the env variable
-YARA_RULES to ```export YARA_RULES=~/rules/```.  Alternatively, we can specify
-the scan argument ```--root=~/rules/```.
+
+
+*Accessing a rules folder:*
+
+
+To access our new rules folder we need to let :mod:`yara.scan` know where to
+look.  We can do this by setting the env variable ``YARA_RULES`` to ``export
+YARA_RULES=~/rules/``.  Alternatively, we can specify the root of the rules
+folder with the input argument ``--root=~/rules/``.
+
 
 Confirm the rules are being loaded by :mod:`yara.scan`::
 
@@ -54,28 +183,35 @@ Confirm the rules are being loaded by :mod:`yara.scan`::
           + pid.spammers
           + pid.loggers
           + pid.infectors
+
+
+*Blacklisting and whitelisting namespaces:*
+
         
-Let's say we want to scan a bunch of files against the YARA rules signatures we
-have defined in our library.  It may not make any sense to include the process
-specific signatures (```pid```), so we can use the blacklist parameter to 
-disable all of our pid rules::
+Let's say we want to scan a bunch of files against all of the yar files under
+``~/rules/file/``.  We can do this two ways.  By either setting our
+``--whitelist=file`` or setting our ``--blacklist=pid``.  
+
+i.e.::
 
     $ python -m yara.scan --blacklist=pid --list
     Rules + file.infectors
           + file.loggers
           + file.spammers
 
-Notice how pid is globbed (pid*) out?  
 
-After our file scan, we find that ```file/spammers.yar``` is creating far too much
-noise to be useful.  Let's so we can blacklist that too::
+Whitelist and blacklist parameters are globbed out (*pid**)?  
+
+
+The results are in and we find that ``file.spammers`` namespace is producing far too much noise.  Let's remove ``file.spammers`` from scan too::
 
     $ python -m yara.scan --blacklist=pid,file.spamm --list 
     Rules + file.infectors
           + file.loggers
 
-Finally, we want to run a scan which includes one of the ```pid``` YARA
-files after all...  Let's include ```pid/spammers.yar```::
+
+To demonstrate the namespace convetion further, we may find ourselves wanting
+to run a scan which includes ```pid.spammers```.  To do this we can simply run::
 
     $ python -m yara.scan --blacklist=file.spamm --whitelist=pid.spam,file --list
     Rules + file.infectors
@@ -83,14 +219,7 @@ files after all...  Let's include ```pid/spammers.yar```::
           + pid.spammers
     
 
-Scanning things
----------------
 
 
 
-
-Controlling your output
------------------------
-
-
-
+.. _yara project: http://code.google.com/p/yara-project

@@ -1,15 +1,14 @@
-Tutorial on using :mod:`yara.scan`
+Scanning with :mod:`yara.scan`
 ==================================
 
 This page should contain all of the information required to successfully
-utilise :mod:`yara.scan` as a system scanning utility.
+operate :mod:`yara.scan` as a system scanning utility.
 
 
 Executing :mod:`yara.scan`
 --------------------------
 
-Once yara-ctypes is installed into your Python environment you can simply kick
-off the scan module as with -h to see how to run a scan::
+Once yara-ctypes is installed into your Python environment you can run the scan module by executing the scan module as follows::
 
     $ python -m yara.scan -h
 
@@ -23,17 +22,6 @@ Performing a scan
 
     Rules + hbgary.compiler
           + example.packer_rules
-          + hbgary.sockets
-          + hbgary.libs
-          + hbgary.compression
-          + hbgary.fingerprint
-          + hbgary.integerparsing
-          + hbgary.antidebug
-          + hbgary.microsoft
-
-    $ python -m yara.scan --list --whitelist=hbgary
-
-    Rules + hbgary.compiler
           + hbgary.sockets
           + hbgary.libs
           + hbgary.compression
@@ -88,7 +76,6 @@ Performing a scan
     > ls -lah result.out 
 
     -rw-rw-r-- 1 mick mick 17M Sep  1 17:37 result.out
-
 
 
 YARA rules files and folder

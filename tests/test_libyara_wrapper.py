@@ -1,6 +1,7 @@
 import unittest
 import os
 import time
+import doctest
 
 import yara
 from yara.libyara_wrapper import *
@@ -15,6 +16,10 @@ class TestLibYara(unittest.TestCase):
         #    filename = "_"
         #print "%s:%s: %s"%(filename, line_number, error_message)
         self.err_callback_count += 1
+
+    def test_readme_doctest(self):
+        """Run doctests on README documentation"""
+        doctest.testfile('../README.rst')
 
     def test_build_context_with_a_rule(self):
         """compile and destroy a good rule"""

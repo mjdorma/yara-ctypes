@@ -7,8 +7,15 @@
 .. sectionauthor:: Michael Dorman <mjdorma@gmail.com>
 
 
-.. automodule:: yara.libyara_wrapper
-    :members:
+
+This module is responsible for wrapping the libyara dynamic library various
+exported functions.  Using ctypes, it replicates the yara data structures and 
+exported functions.
+
+
+See :ref:`How to build <howto-build>` for library details.
+
+
 
 
 

@@ -27,24 +27,17 @@ DEFAULT_THREAD_POOL = 4
 
 
 class Scanner:
-    """Scan process IDs or file paths.
-        
-    Returns results as they become available through an iteration sequence::
-
-        # Recursively scan all the paths from '.'
-        for path, result in Scanner(paths=['.']):
-            print("%s : %s" % (path, result))
-    """
+    """Scan process IDs or file paths."""
     def __init__(self, pids=[], paths=[],
                        rules_rootpath=yara.YARA_RULES_ROOT,
                        whitelist=[],
                        blacklist=[],
                        thread_pool=DEFAULT_THREAD_POOL):
-        """yara scanner class.
+        """Scanner yields scan results in a tuple of (path|pid, result)
 
         kwargs:
             pids - list of process ids to scan
-            paths - list of paths to scan
+            paths - globbed out list of paths to scan
             rules_rootpath - path to the root of the rules directory
             whitelist - whitelist of rules to use in scanner
             blacklist - blacklist of rules to not use in scanner
@@ -82,10 +75,12 @@ class Scanner:
 
     @property
     def sq_size(self):
+        """contains the current scan queue size"""
         return self._jq.unfinished_tasks
 
     @property
     def rq_size(self):
+        """contains the current result queue size"""
         return self._rq.unfinished_tasks
 
     def _run(self):

@@ -1,8 +1,10 @@
+.. _howto-build:
+
 Building libyara-1.6 for yara-ctypes
 ====================================
 
-The intention of this guide is to capture some of the steps taken to make a 
-clean checkout of tags/yara-1.6/ build and work for yara-ctypes.
+This guide captures some of the steps taken to make a clean checkout of
+tags/yara-1.6/ build and work for yara-ctypes.
 
 
 Patch a clean checkout of yara-1.6
@@ -87,12 +89,14 @@ Install prerequisites::
 
 
 Run the build::
+
     > autoreconf -fiv # force an autoreconf (or update/replace libtools m4) 
     > install build auto tools (including autoconf autogen)
     > find the latest pcre and bison - build them! :P
     > cd $ROOTDIR/yara-1.6/
     > ./configure
     > make  
+
 
 This will get you a 32bit dll.  If you figure out how to do it under mingw64,
 let me know... 

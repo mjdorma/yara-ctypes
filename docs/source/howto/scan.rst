@@ -1,5 +1,7 @@
-Scanning with :mod:`yara.scan`
-==================================
+.. _howto-scan:
+
+How to scan with :mod:`yara.scan` 
+=====================================
 
 This page should contain all of the information required to successfully
 operate :mod:`yara.scan` as a system scanning utility.
@@ -187,7 +189,7 @@ i.e.::
           + file.spammers
 
 
-Whitelist and blacklist parameters are globbed out (*pid**)?  
+Whitelist and blacklist parameters are globbed out (*i.e. pid**).  
 
 
 The results are in and we find that ``file.spammers`` namespace is producing far too much noise.  Let's remove ``file.spammers`` from scan too::

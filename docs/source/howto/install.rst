@@ -34,8 +34,8 @@ Here is how to install from the master::
 
 
 
-Missing a dll?  Try installing the MS VC++ 2010 redistributable package 
------------------------------------------------------------------------
+Missing a dll? Try installing MS VC++ 2010 redistributable package 
+------------------------------------------------------------------
 
 The shipped dlls' were built using Visual Studio 2010.  If you do not have the
 appropriate runtime already installed you will get an error message pop
@@ -51,7 +51,9 @@ Failing to import libyara
 
 At this point you need to figure out if the shipped library file is compatible
 with your system/platform.  You may need to build your own libyara library from
-scratch.  See :doc:`build` for more information.
+scratch.  
+
+See :doc:`build` for more information.
 
 
 

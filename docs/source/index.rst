@@ -1,8 +1,3 @@
-.. note::
-
-    *this doc is a work in progress*
-
-
 Introduction to yara-ctypes-python
 ==================================
 

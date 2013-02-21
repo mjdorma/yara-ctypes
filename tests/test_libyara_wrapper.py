@@ -5,8 +5,6 @@ import doctest
 
 import yara
 from yara.libyara_wrapper import *
-import sys
-sys.path.append(r'C:\Python26\DLLs')
 
 
 class TestLibYara(unittest.TestCase):

@@ -13,7 +13,7 @@ rapidly execute their yara signatures against file(s) and pid(s).
 
 See :ref:`How to scan <howto-scan>` for more details.
 
-:py:class:`Scanner` Object 
+:py:class:`Scanner`  
 ---------------------------
  
 .. py:class:: Scanner([pids,paths,rules_rootpath,\

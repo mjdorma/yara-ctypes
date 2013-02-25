@@ -32,19 +32,22 @@ for path, _, files in os.walk(os.path.join('yara', 'rules')):
 
 #see if we have a pre-built libyara for this platform
 arch, exetype = platform.architecture()
-libs = []
-libspath = os.path.join('.', 'libs', exetype, arch)
-if os.path.exists(libspath):
-    for lib in filter(lambda x: os.path.splitext(x)[-1] in ['.so', '.dll'],
-            os.listdir(libspath)):
-        libs.append(os.path.join(libspath, lib))
+system = platform.system().lower()
+machine = platform.machine().lower()
+
+if system == 'windows':
+    ext = '.dll'
+else:
+    ext = '.so'
+
+libyara_path = os.path.join('.', 'libs', system, machine, "libyara" + ext)
 data_files = []
-if libs:
-    if exetype == 'ELF':
-        libdir = os.path.join(sys.prefix, 'lib')
+if os.path.exists(libyara_path):
+    if system == 'windows':
+        install_libdir = os.path.join(sys.prefix, 'DLLs')
     else:
-        libdir = os.path.join(sys.prefix, 'DLLs')
-    data_files.append((libdir, libs))
+        install_libdir = os.path.join(sys.prefix, 'lib')
+    data_files.append((install_libdir, [libyara_path]))
 else:
     print("WARNING: No libs found at %s" % libspath)
     print("You need to 'make install' libyara (yara-1.6) for this platform")

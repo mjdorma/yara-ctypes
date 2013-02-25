@@ -49,8 +49,9 @@ if os.path.exists(libyara_path):
         install_libdir = os.path.join(sys.prefix, 'lib')
     data_files.append((install_libdir, [libyara_path]))
 else:
-    print("WARNING: No libs found at %s" % libspath)
-    print("You need to 'make install' libyara (yara-1.6) for this platform")
+    print("WARNING: Could not find %s" % libyara_path)
+    print("You need to 'make install' libyara for this system/machine")
+    print("See http://pythonhosted.org/yara/ for help")
 
 setup(
     name="yara",

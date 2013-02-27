@@ -76,6 +76,10 @@ Windows 7:
  + CPython 2.6 (32bit, 64bit)
  + CPython 3.2 (32bit, 64bit)
 
+OS X Mountain Lion
+
+ + CPython 2.7 (64bit)
+
 
 Continuous integration testing is provided by `Travis CI <http://travis-ci.org/>`_.
 

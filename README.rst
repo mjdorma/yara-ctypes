@@ -95,7 +95,7 @@ with GitHub's issues system.
 Change log
 ==========
 
-version 1.6.2 (01/09/2012)
+version 1.6.2 (28/02/2012)
 
 * support for OS X Mountain Lion
 

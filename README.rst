@@ -95,9 +95,9 @@ with GitHub's issues system.
 Change log
 ==========
 
-version 1.6.0 (01/09/2012)
+version 1.6.2 (01/09/2012)
 
-* Initial release
+* support for OS X Mountain Lion
 
 version 1.6.1 (06/09/2012)
 
@@ -105,6 +105,9 @@ version 1.6.1 (06/09/2012)
 * Bug fixes 
 * Added documentation
 
+version 1.6.0 (01/09/2012)
+
+* Initial release
 
 
 .. _github.com: https://github.com/mjdorma/yara-ctypes

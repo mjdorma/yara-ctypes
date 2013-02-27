@@ -105,39 +105,75 @@ let me know...
 *Build under Visual Studios*
 
 To build using Visual Studio, the following settings were added to the
-``windows/libyara/libyara.vcproj`` project.
+``windows/libyara/libyara.vcproj`` Properties Page.
 
- * properties->
+ * [General][Configuration Type] = "Dynamic Library (.dll)" 
+ * [C/C++][Runtime Library] = "Multi-threaded DLL (/MD)"
 
+The *C/C++* All Options view::
+    
+    /I"..\..\windows\include" /Zi /nologo /W1 /WX- /O2 /Ob2 /Oi /Ot /Oy- /D "PCRE_STATIC" /D "_WINDLL" /D "_MBCS" /Gm- /MD /GS- /fp:precise /Zc:wchar_t /Zc:forScope /Fp"Release\libyara.pch" /Fa"Release\" /Fo"Release\" /Fd"Release\vc100.pdb" /Gd /TC /wd"4996" /analyze- /errorReport:queue
+
+The *Linker* All Options view::
+    
+    /OUT:".\yara\tags\yara-1.6.0\windows\libyara\Release\libyara.dll" /NOLOGO /LIBPATH:"..\lib" /LIBPATH:".\yara\tags\yara-1.6.0\windows\libyara\Release\" /DLL "pcre32.lib" "kernel32.lib" "user32.lib" "gdi32.lib" "winspool.lib" "comdlg32.lib" "advapi32.lib" "shell32.lib" "ole32.lib" "oleaut32.lib" "uuid.lib" "odbc32.lib" "odbccp32.lib" /MANIFEST /ManifestFile:"Release\libyara.dll.intermediate.manifest" /ALLOWISOLATION /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /PDB:".\yara\tags\yara-1.6.0\windows\libyara\Release\libyara.pdb" /PGD:".\yara\tags\yara-1.6.0\windows\libyara\Release\libyara.pgd" /TLBID:1 /DYNAMICBASE /NXCOMPAT /MACHINE:X86 /ERRORREPORT:QUEUE 
 
 Finally, to export the functions in the libyara.dll you need to ensure that
 each export function ``includes/yara.h`` has a ``__declspec(dllexport)``
 defined before it::
- 
-    __declspec(dllexport) RULE*             lookup_rule(RULE_LIST* rules, const char* identifier, NAMESPACE* ns);
-    __declspec(dllexport) STRING*           lookup_string(STRING* string_list_head, const char* identifier);
-    __declspec(dllexport) TAG*              lookup_tag(TAG* tag_list_head, const char* identifier);
-    __declspec(dllexport) META*             lookup_meta(META* meta_list_head, const char* identifier);
-    __declspec(dllexport) VARIABLE*         lookup_variable(VARIABLE* _list_head, const char* identifier);
-    __declspec(dllexport) void              yr_init();
-    __declspec(dllexport) YARA_CONTEXT*     yr_create_context();
-    __declspec(dllexport) void              yr_destroy_context(YARA_CONTEXT* context);
-    __declspec(dllexport) int               yr_calculate_rules_weight(YARA_CONTEXT* context);
-    __declspec(dllexport) NAMESPACE*        yr_create_namespace(YARA_CONTEXT* context, const char* name);
-    __declspec(dllexport) int               yr_define_integer_variable(YARA_CONTEXT* context, const char* identifier, size_t value);
-    __declspec(dllexport) int               yr_define_boolean_variable(YARA_CONTEXT* context, const char* identifier, int value);
-    __declspec(dllexport) int               yr_define_string_variable(YARA_CONTEXT* context, const char* identifier, const char* value);
-    __declspec(dllexport) int               yr_undefine_variable(YARA_CONTEXT* context, const char* identifier);
-    __declspec(dllexport) char*             yr_get_current_file_name(YARA_CONTEXT* context);
-    __declspec(dllexport) int               yr_push_file_name(YARA_CONTEXT* context, const char* file_name);
-    __declspec(dllexport) void              yr_pop_file_name(YARA_CONTEXT* context);
-    __declspec(dllexport) int               yr_compile_file(FILE* rules_file, YARA_CONTEXT* context);
-    __declspec(dllexport) int               yr_compile_string(const char* rules_string, YARA_CONTEXT* context);
-    __declspec(dllexport) int               yr_scan_mem(unsigned char* buffer, size_t buffer_size, YARA_CONTEXT* context, YARACALLBACK callback, void* user_data);
-    __declspec(dllexport) int               yr_scan_file(const char* file_path, YARA_CONTEXT* context, YARACALLBACK callback, void* user_data);
-    __declspec(dllexport) int               yr_scan_proc(int pid, YARA_CONTEXT* context, YARACALLBACK callback, void* user_data);
-    __declspec(dllexport) char*             yr_get_error_message(YARA_CONTEXT* context, char* buffer, int buffer_size);
-    __declspec(dllexport) void              yr_free_matches(YARA_CONTEXT* context);
+
+    >>>yara.h<<<
+     __declspec(dllexport) RULE*             lookup_rule(RULE_LIST* rules, const char* identifier, NAMESPACE* ns);
+     __declspec(dllexport) STRING*           lookup_string(STRING* string_list_head, const char* identifier);
+     __declspec(dllexport) TAG*              lookup_tag(TAG* tag_list_head, const char* identifier);
+     __declspec(dllexport) META*             lookup_meta(META* meta_list_head, const char* identifier);
+     __declspec(dllexport) VARIABLE*         lookup_variable(VARIABLE* _list_head, const char* identifier);
+     __declspec(dllexport) void              yr_init();
+     __declspec(dllexport) YARA_CONTEXT*     yr_create_context();
+     __declspec(dllexport) void              yr_destroy_context(YARA_CONTEXT* context);
+     __declspec(dllexport) int               yr_calculate_rules_weight(YARA_CONTEXT* context);
+     __declspec(dllexport) NAMESPACE*        yr_create_namespace(YARA_CONTEXT* context, const char* name);
+     __declspec(dllexport) int               yr_define_integer_variable(YARA_CONTEXT* context, const char* identifier, size_t value);
+     __declspec(dllexport) int               yr_define_boolean_variable(YARA_CONTEXT* context, const char* identifier, int value);
+     __declspec(dllexport) int               yr_define_string_variable(YARA_CONTEXT* context, const char* identifier, const char* value);
+     __declspec(dllexport) int               yr_undefine_variable(YARA_CONTEXT* context, const char* identifier);
+     __declspec(dllexport) char*             yr_get_current_file_name(YARA_CONTEXT* context);
+     __declspec(dllexport) int               yr_push_file_name(YARA_CONTEXT* context, const char* file_name);
+     __declspec(dllexport) void              yr_pop_file_name(YARA_CONTEXT* context);
+     __declspec(dllexport) int               yr_compile_file(FILE* rules_file, YARA_CONTEXT* context);
+     __declspec(dllexport) int               yr_compile_string(const char* rules_string, YARA_CONTEXT* context);
+     __declspec(dllexport) int               yr_scan_mem(unsigned char* buffer, size_t buffer_size, YARA_CONTEXT* context, YARACALLBACK callback, void* user_data);
+     __declspec(dllexport) int               yr_scan_file(const char* file_path, YARA_CONTEXT* context, YARACALLBACK callback, void* user_data);
+     __declspec(dllexport) int               yr_scan_proc(int pid, YARA_CONTEXT* context, YARACALLBACK callback, void* user_data);
+     __declspec(dllexport) char*             yr_get_error_message(YARA_CONTEXT* context, char* buffer, int buffer_size);
+     __declspec(dllexport) void              yr_free_matches(YARA_CONTEXT* context);
+
+
+Building for OS X Mountain Lion
+-------------------------------
+
+Install Homebrew and install the following packages::
+    
+    brew install libtool pcre bison automake autoconf svn
+
+Patch libyara/configure.ac with the following::
+    
+    >>>libyara/configure.ac<<<
+    + m4_pattern_allow([AM_PROG_AR])
+    + AM_PROG_AR
+
+Reconfigure the auto build tool chain::
+    
+    autoreconf -fiv
+
+Due to a bug in the auto config files (somewhere) replace the generated libyara/libtool with::
+    
+    rm libyara/libtool
+    ln -s /usr/local/Cellar/libtool/2.4.2/bin/glibtool libyara/libtool
+
+Copy and rename the dynamic link library::
+    
+    cp ./libyara/.libs/libyara.0.dylib <DESTPATH>/libyara.so
 
 
 Bundling libyara shared library files
@@ -149,14 +185,19 @@ running ``python setup.py install``
 
 Windows::
 
-    ./libs/WindowsPE/64bit/libyara.dll
-    ./libs/WindowsPE/32bit/libyara.dll
+    ./libs/windows/x86_64/libyara.dll
+    ./libs/windows/x86/libyara.dll
 
 
 Linux::
 
-    ./libs/ELF/64bit/libyara.so
-    ./libs/ELF/32bit/libyara.so
+    ./libs/linux/x86_64/libyara.so
+    ./libs/linux/x86/libyara.so
+
+
+OS X::
+    
+    ./libs/darwin/x86_64/libyara.so
 
 
 Alternatively you can install your libyara files in the correct place such that

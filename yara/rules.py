@@ -149,8 +149,9 @@ class RuleContext():
         """
         self._process_externals(kwargs.get('externals', {}))
         callback = kwargs.get('callback', None)
-        if not hasattr(callback, '__call__'):
-            raise TypeError("callback object not a callable")
+        if callback is not None:
+            if not hasattr(callback, '__call__'):
+                raise TypeError("callback object not a callable")
         self._matches = {}
         self._callback_error = None
         self._match_callback = callback

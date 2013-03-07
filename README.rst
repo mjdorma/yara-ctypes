@@ -95,7 +95,11 @@ with GitHub's issues system.
 Change log
 ==========
 
-version 1.6.2 (28/02/2012)
+version 1.6.3 (08/03/2013)
+
+* bug fix to yara.py (callback callable check)
+
+version 1.6.2 (28/02/2013)
 
 * support for OS X Mountain Lion
 

@@ -150,7 +150,7 @@ class RuleContext():
         self._process_externals(kwargs.get('externals', {}))
         callback = kwargs.get('callback', None)
         if callback is not None:
-            if type(callback) is not types.FunctionType:
+            if type(callback) is not types.FunctionType and type(callback) is not types.MethodType:
                 raise TypeError("Callback not a function")
         self._matches = {}
         self._callback_error = None

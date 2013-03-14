@@ -18,6 +18,12 @@ CALLBACK_CONTINUE = 0
 CALLBACK_ABORT = 1
 
 
+if sys.version_info[0] < 3: 
+    INT_TYPES = [long, int]
+else:
+    INT_TYPES = [int]
+
+
 class RuleContext():
     """Wraps a libyara context and provides additional state to gain finer
     control over libyara's matching execution.  This class is responsible
@@ -131,7 +137,7 @@ class RuleContext():
 
     def _process_externals(self, externals):
         for key, value in externals.items():
-            if type(value) in [long, int]:
+            if type(value) in INT_TYPES:
                 yr_define_integer_variable(self._context, key, value)
             elif type(value) is bool:
                 yr_define_boolean_variable(self._context, key, value)

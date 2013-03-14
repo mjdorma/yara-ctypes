@@ -56,7 +56,7 @@ class Scanner:
                                       externals=externals,
                                       fast_match=fast_match)
         else:
-            self._rules = yara.compile(filepath=rules_filepath)
+            self._rules = yara.compile(filepath=rule_filepath)
 
         print(self._rules, file=sys.stderr)
         self._jq = Queue()
@@ -236,6 +236,7 @@ def main(args):
     pids = []
     paths = args
     rules_rootpath = yara.YARA_RULES_ROOT
+    rule_filepath = None
     list_rules = False
     stream = sys.stdout
     stream_fmt = str
@@ -247,7 +248,7 @@ def main(args):
             print(__help__)
             return 0
         elif opt in ['--root']:
-            if os.path.exists(rules_rootpath):
+            if os.path.exists(arg):
                 print("root path '%s' does not exist" % arg, file=sys.stderr)
                 return -1
             rules_rootpath = arg
@@ -268,7 +269,7 @@ def main(args):
         elif opt in ['-i']:
             idents_filter = arg
         elif opt in ['-r', '--rule']:
-            if os.path.exists(rules_rootpath):
+            if os.path.exists(arg):
                 print("rule path '%s' does not exist" % arg, file=sys.stderr)
                 return -1
             rule_filepath = arg
@@ -319,7 +320,7 @@ def main(args):
                       rules_rootpath=rules_rootpath,
                       whitelist=whitelist,
                       blacklist=blacklist,
-                      rules_filepath=rules_filepath,
+                      rule_filepath=rule_filepath,
                       thread_pool=thread_pool,
                       fast_match=fast_match,
                       externals=externals)

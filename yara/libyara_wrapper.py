@@ -31,20 +31,20 @@ STRING_FLAGS_FULL_WORD                 = 0x80
 STRING_FLAGS_ANONYMOUS                 = 0x100
 STRING_FLAGS_FAST_MATCH                = 0x200
 
-def IS_HEX(x):
-    return x.contents.flags & STRING_FLAGS_HEXADECIMAL
-def IS_NO_CASE(x):
-    return x.contents.flags & STRING_FLAGS_NO_CASE
-def IS_ASCII(x):
-    return x.contents.flags & STRING_FLAGS_ASCII
-def IS_WIDE(x):
-    return x.contents.flags & STRING_FLAGS_WIDE
-def IS_REGEXP(x):
-    return x.contents.flags & STRING_FLAGS_REGEXP
-def IS_FULL_WORD(x):
-    return x.contents.flags & STRING_FLAGS_FULL_WORD
-def IS_ANONYMOUS(x):
-    return x.contents.flags & STRING_FLAGS_ANONYMOUS
+def IS_HEX(flags):
+    return flags & STRING_FLAGS_HEXADECIMAL
+def IS_NO_CASE(flags):
+    return flags & STRING_FLAGS_NO_CASE
+def IS_ASCII(flags):
+    return flags & STRING_FLAGS_ASCII
+def IS_WIDE(flags):
+    return flags & STRING_FLAGS_WIDE
+def IS_REGEXP(flags):
+    return flags & STRING_FLAGS_REGEXP
+def IS_FULL_WORD(flags):
+    return flags & STRING_FLAGS_FULL_WORD
+def IS_ANONYMOUS(flags):
+    return flags & STRING_FLAGS_ANONYMOUS
 
 RULE_FLAGS_MATCH                       = 0x01
 RULE_FLAGS_PRIVATE                     = 0x02

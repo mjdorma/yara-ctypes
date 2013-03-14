@@ -32,6 +32,7 @@ class Scanner:
                        rules_rootpath=yara.YARA_RULES_ROOT,
                        whitelist=[],
                        blacklist=[],
+                       rule_filepath=None,
                        thread_pool=DEFAULT_THREAD_POOL,
                        fast_match=False,
                        externals={}):
@@ -47,12 +48,16 @@ class Scanner:
             fast_match - scan fast True / False 
             externals - externally defined variables             
         """
-        self._rules = yara.load_rules(rules_rootpath=rules_rootpath,
+        if rule_filepath is None:
+            self._rules = yara.load_rules(rules_rootpath=rules_rootpath,
                                       blacklist=blacklist,
                                       whitelist=whitelist,
                                       includes=True,
                                       externals=externals,
                                       fast_match=fast_match)
+        else:
+            self._rules = yara.compile(filepath=rules_filepath)
+
         print(self._rules, file=sys.stderr)
         self._jq = Queue()
         self._rq = Queue()
@@ -146,9 +151,13 @@ Scan control:
     --fast
         fast matching mode
 
-Rule control:
     -d <identifier>=<value>
         define external variable.
+
+Load rules control:
+  namespace: 
+    --list
+        list available YARA namespaces
 
     -w, --whitelist=
         whitelist of comma separated YARA namespaces to include in scan
@@ -156,11 +165,13 @@ Rule control:
     -b, --blacklist=
         blacklist of comma separated YARA namespaces to exclude from scan
 
-    --list
-        list available YARA namespaces
-
     --root=(env[YARA_RULES] or <pkg>/yara/rules/)
         set the YARA_RULES path (path to the root of the rules directory)
+  
+  filepath:
+    -r, --rule=
+        Use the rule file specified by this input argument and ignore the
+        YARA namespaces
 
 Output control:
     --fmt=dict
@@ -202,13 +213,14 @@ def match_filter(tags_filter, idents_filter, res):
 def main(args):
 
     try:
-        opts, args = getopt(args, 'hw:b:t:o:i:d:', ['proc',
+        opts, args = getopt(args, 'hw:b:t:o:i:d:r:', ['proc',
                                               'whitelist=',
                                               'blacklist=',
                                               'thread_pool=',
                                               'root=',
                                               'list',
                                               'fmt=',
+                                              'rule=',
                                               'fast',
                                               'help'])
     except Exception as exc:
@@ -217,6 +229,7 @@ def main(args):
 
     whitelist = []
     blacklist = []
+    rule_filepath = None
     thread_pool = 4
     externals = {}
     fast_match = False
@@ -254,6 +267,11 @@ def main(args):
             tags_filter = set(arg.split(','))
         elif opt in ['-i']:
             idents_filter = arg
+        elif opt in ['-r', '--rule']:
+            if os.path.exists(rules_rootpath):
+                print("rule path '%s' does not exist" % arg, file=sys.stderr)
+                return -1
+            rule_filepath = arg
         elif opt in ['-w', '--whitelist']:
             whitelist = arg.split(',')
         elif opt in ['b', '--blacklist']:
@@ -301,6 +319,7 @@ def main(args):
                       rules_rootpath=rules_rootpath,
                       whitelist=whitelist,
                       blacklist=blacklist,
+                      rules_filepath=rules_filepath,
                       thread_pool=thread_pool,
                       fast_match=fast_match,
                       externals=externals)
@@ -314,11 +333,11 @@ def main(args):
                 status = status_template % (scanner.sq_size, scanner.rq_size)
                 sys.stderr.write("\b" * len(status) + status)
 
-            res = match_filter(tags_filter, idents_filter)
+            res = match_filter(tags_filter, idents_filter, res)
             if res:
-                print("<scan arg='%s'>" % arg, file=self.stream)
-                print(stream_fmt(res), file=self.stream)
-                print("</scan>", file=self.stream)
+                print("<scan arg='%s'>" % arg, file=stream)
+                print(stream_fmt(res), file=stream)
+                print("</scan>", file=stream)
     finally:
         scanner.quit.set()
         status = status_template % (scanner.sq_size, scanner.rq_size)

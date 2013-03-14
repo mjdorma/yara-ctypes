@@ -102,7 +102,7 @@ class TestRulesMemoryLeakHunt(unittest.TestCase):
 
 
 class TestYaraCompile(unittest.TestCase):
-    """ """
+    """test yara compile interface"""
     def setUp(self):
         self.target = os.path.join(os.path.split(__file__)[0], '..', 'libs',
                        'windows', 'x86', 'libyara.dll')
@@ -153,7 +153,7 @@ class TestYaraCompile(unittest.TestCase):
 
 
 class TestYaraBuildnameSpacedRules(unittest.TestCase):
-    """ """
+    """ test yara build namespaced rules interface """
     def setUp(self):
         self.target = os.path.join(os.path.split(__file__)[0], '..', 'libs',
                         'windows', 'x86', 'libyara.dll')
@@ -194,6 +194,120 @@ class TestYaraBuildnameSpacedRules(unittest.TestCase):
         self.assertTrue('hbgary.fingerprint' not in rules.namespaces)
         self.assertTrue('example.packer_rules' not in rules.namespaces)
         self.assertTrue(len(rules.namespaces) == 6)
+
+
+class TestPrivateRule(unittest.TestCase):
+    """ test the private rule behaviour """
+
+    def test_private_rule(self):
+        """test private rule behaviour"""
+        source = """
+private rule PrivateTestRule
+{
+    strings:
+        $a = "private"
+
+    condition:
+        $a
+}
+
+rule TestRule
+{
+    condition:
+        PrivateTestRule
+}
+"""
+        rules = yara.compile(source=source)
+        res = rules.match_data("private rule ftw")
+        self.assertTrue('main' in res)
+        self.assertEqual(len(res['main']), 1)
+        self.assertTrue(res['main'][0]['rule'], "TestRule")
+        res = rules.match_data("aaa")
+        self.assertTrue('main' not in res)
+
+
+class TestRuleMeta(unittest.TestCase):
+    """ test the meta data is extracted from a rule """
+
+    def test_meta_is_exported(self):
+        """test meta data export"""
+        source = """
+rule TestMeta
+{
+    meta:
+        signature = "this is my sig"
+        excitement = 10
+        want = true
+
+    strings:
+        $test_string = " bird"
+
+    condition:
+        $test_string
+}
+"""
+        rules = yara.compile(source=source)
+        res = rules.match_data("mocking bird")
+        self.assertTrue('main' in res)
+        self.assertEqual(len(res['main']), 1)
+        meta = res['main'][0]['meta']
+        self.assertEqual(meta['excitement'], 10)
+        self.assertEqual(meta['signature'], "this is my sig")
+        self.assertEqual(meta['want'], True)
+        res = rules.match_data("no mocking this time")
+        self.assertTrue('main' not in res)
+
+
+class TestRuleExternals(unittest.TestCase):
+    """ test rules inputs and outputs"""    
+
+    def test_external_int(self):
+        """confirm external int works """
+        source = """
+rule TestExtern
+{
+    condition:
+        ext_var == 10
+}"""
+        rules = yara.compile(source=source, externals=dict(ext_var=10))
+        res = rules.match_data("aaa")
+        self.assertTrue('main' in res)
+        self.assertEqual(len(res['main']), 1)
+        self.assertTrue(res['main'][0]['rule'], "TestExtern")
+        res = rules.match_data("aaa", externals=dict(ext_var=1))
+        self.assertTrue('main' not in res)
+
+    def test_external_string(self):
+        """confirm external string works """
+        source = """
+rule TestExtern
+{
+    condition:
+        ext_var contains "test"
+}"""
+        rules = yara.compile(source=source, externals=dict(ext_var="my test"))
+        res = rules.match_data("aaa")
+        self.assertTrue('main' in res)
+        self.assertEqual(len(res['main']), 1)
+        self.assertTrue(res['main'][0]['rule'], "TestExtern")
+        res = rules.match_data("aaa", externals=dict(ext_var="tset ym"))
+        self.assertTrue('main' not in res)
+
+    def test_external_bool(self):
+        """confirm external bool works """
+        source = """
+rule TestExtern
+{
+    condition:
+        ext_var
+}"""
+        rules = yara.compile(source=source, externals=dict(ext_var=True))
+        res = rules.match_data("aaa")
+        self.assertTrue('main' in res)
+        self.assertEqual(len(res['main']), 1)
+        self.assertTrue(res['main'][0]['rule'], "TestExtern")
+        res = rules.match_data("aaa", externals=dict(ext_var=False))
+        self.assertTrue('main' not in res)
 
 
 if __name__ == "__main__":

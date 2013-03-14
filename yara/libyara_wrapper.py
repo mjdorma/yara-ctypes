@@ -439,7 +439,7 @@ def yr_define_boolean_variable(context, name, size):
 libyaradll.yr_define_string_variable.restype = c_int
 libyaradll.yr_define_string_variable.argtypes = [POINTER(YARA_CONTEXT),
                                                 c_char_p,
-                                                c_size_t]
+                                                c_char_p]
 def yr_define_string_variable(context, name, size):
     return libyaradll.yr_define_string_variable(context, tobyte(name),
             size)

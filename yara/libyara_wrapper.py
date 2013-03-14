@@ -319,20 +319,22 @@ class YaraMatchError(Exception):
 
 
 #convert unicode to ascii if we're in 3x
-def tobyte(s):
-    if sys.version_info[0] < 3: #major
+if sys.version_info[0] < 3: #major
+    def tobyte(s):
         return s
-    else:
+else:
+    def tobyte(s):
         if type(s) is bytes:
             return s
         else:
             return s.encode('utf-8')
 
 
-def frombyte(s):
-    if sys.version_info[0] < 3: #major
+if sys.version_info[0] < 3: #major
+    def frombyte(s):
         return s
-    else:
+else:
+    def frombyte(s):
         if type(s) is bytes:
             return str(s, 'utf-8')
         else:

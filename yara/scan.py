@@ -32,7 +32,9 @@ class Scanner:
                        rules_rootpath=yara.YARA_RULES_ROOT,
                        whitelist=[],
                        blacklist=[],
-                       thread_pool=DEFAULT_THREAD_POOL):
+                       thread_pool=DEFAULT_THREAD_POOL,
+                       fast_match=False,
+                       externals={}):
         """Scanner yields scan results in a tuple of (path|pid, result)
 
         kwargs:
@@ -42,11 +44,15 @@ class Scanner:
             whitelist - whitelist of rules to use in scanner
             blacklist - blacklist of rules to not use in scanner
             thread_pool - number of threads to use in scanner
+            fast_match - scan fast True / False 
+            externals - externally defined variables             
         """
         self._rules = yara.load_rules(rules_rootpath=rules_rootpath,
                                       blacklist=blacklist,
                                       whitelist=whitelist,
-                                      includes=True)
+                                      includes=True,
+                                      externals=externals,
+                                      fast_match=fast_match)
         print(self._rules, file=sys.stderr)
         self._jq = Queue()
         self._rq = Queue()
@@ -127,8 +133,22 @@ SYNOPSIS
 
 DESCRIPTION
 
+Scan control:
     --proc
-        scan PIDs
+        scan PIDs. This indicate that trailing args are PIDS
+
+    --ext=
+        file extension inclusion filter (comma separate list)
+
+    --thread_pool=%s
+        size of the thread pool used for scanning
+
+    --fast
+        fast matching mode
+
+Rule control:
+    -d <identifier>=<value>
+        define external variable.
 
     -w, --whitelist=
         whitelist of comma separated YARA namespaces to include in scan
@@ -136,37 +156,60 @@ DESCRIPTION
     -b, --blacklist=
         blacklist of comma separated YARA namespaces to exclude from scan
 
-    -t, --thread_pool=%s
-        size of the thread pool used for scanning
-
-    --ext=
-        file extension inclusion filter (comma separate list)
-
-    --fmt=dict
-        output format [dict|pprint|json|pickle|marshal]
-
-    -o
-        outfile path -> redirect stdout results to outfile
-
     --list
         list available YARA namespaces
 
     --root=(env[YARA_RULES] or <pkg>/yara/rules/)
         set the YARA_RULES path (path to the root of the rules directory)
 
+Output control:
+    --fmt=dict
+        output format [dict|pprint|json|pickle|marshal]
+    -o
+        outfile path -> redirect stdout results to outfile
+
+    -t  [tag1,tag2,tag3, ...]
+        print matches that contain specific tags and filter out the rest
+
+    -i  [ident1,ident2,ident3, ...]
+        print matches that contain specific identifiers and filter out the rest
+
 """ % DEFAULT_THREAD_POOL
+
+def match_filter(tags_filter, idents_filter, res):
+    if tags_filter is not None:
+        new_res = {}
+        for ns, matches in res.iteritems():
+            for match in matches:
+                if tags_filter.intersection(match['tags']):
+                    mlist = new_res.get(ns, [])
+                    mlist.append(match)
+                    new_res[ns] = mlist
+        res = new_res
+    if idents_filter is not None:
+        new_res = {}
+        for ns, matches in res.iteritems():
+            for match in matches:
+                idents = [s['identifier'] for s in match['strings']]
+                if idents_filter.intersection(idents):
+                    mlist = new_res.get(ns, [])
+                    mlist.append(match)
+                    new_res[ns] = mlist
+        res = new_res
+    return res
 
 
 def main(args):
 
     try:
-        opts, args = getopt(args, 'hw:b:t:o:', ['proc',
+        opts, args = getopt(args, 'hw:b:t:o:i:d:', ['proc',
                                               'whitelist=',
                                               'blacklist=',
                                               'thread_pool=',
                                               'root=',
                                               'list',
                                               'fmt=',
+                                              'fast',
                                               'help'])
     except Exception as exc:
         print("Getopt error: %s" % (exc), file=sys.stderr)
@@ -175,12 +218,16 @@ def main(args):
     whitelist = []
     blacklist = []
     thread_pool = 4
+    externals = {}
+    fast_match = False
     pids = []
     paths = args
-    out = sys.stdout
-    out_fmt = str
     rules_rootpath = yara.YARA_RULES_ROOT
     list_rules = False
+    stream = sys.stdout
+    stream_fmt = str
+    tags_filter = None
+    idents_filter = None
 
     for opt, arg in opts:
         if opt in ['-h', '--help']:
@@ -191,27 +238,38 @@ def main(args):
                 print("root path '%s' does not exist" % arg, file=sys.stderr)
                 return -1
             rules_rootpath = arg
+        elif opt in ['-d']:
+            try:
+                externals.update(eval("dict(%s)" % arg))
+            except SyntaxError:
+                print("external '%s' syntax error" % arg, file=sys.stderr)
+                return -1
+        elif opt in ['--fast']:
+            fast_match = True
         elif opt in ['--list']:
             list_rules = True
         elif opt in ['-o']:
-            out = open(arg, 'wb')
+            stream = open(arg, 'wb')
+        elif opt in ['-t']:
+            tags_filter = set(arg.split(','))
+        elif opt in ['-i']:
+            idents_filter = arg
         elif opt in ['-w', '--whitelist']:
             whitelist = arg.split(',')
         elif opt in ['b', '--blacklist']:
             blacklist = arg.split(',')
         elif opt in ['--fmt']:
             if arg == 'pickle':
-                out_fmt = pickle.dumps
+                stream_fmt = pickle.dumps
             elif arg == 'json':
-                out_fmt = lambda a: json.dumps(a, ensure_ascii=False,
-                                                  check_circular=False,
-                                                  indent=4)
+                stream_fmt = lambda a: json.dumps(a, ensure_ascii=False,
+                                                check_circular=False, indent=4)
             elif arg == 'pprint':
-                out_fmt = pprint.pformat
+                stream_fmt = pprint.pformat
             elif arg == 'marshal':
-                out_fmt = marshal.dumps
+                stream_fmt = marshal.dumps
             elif arg == 'dict':
-                out_fmt = str
+                stream_fmt = str
             else:
                 print("unknown output format %s" % arg, file=sys.stderr)
                 return -1
@@ -243,7 +301,9 @@ def main(args):
                       rules_rootpath=rules_rootpath,
                       whitelist=whitelist,
                       blacklist=blacklist,
-                      thread_pool=thread_pool)
+                      thread_pool=thread_pool,
+                      fast_match=fast_match,
+                      externals=externals)
 
     try:
         status_template = "scan queue: %-7s result queue: %-7s"
@@ -253,10 +313,12 @@ def main(args):
             if i % 20 == 0:
                 status = status_template % (scanner.sq_size, scanner.rq_size)
                 sys.stderr.write("\b" * len(status) + status)
+
+            res = match_filter(tags_filter, idents_filter)
             if res:
-                print("<scan arg='%s'>" % arg, file=out)
-                print(out_fmt(res), file=out)
-                print("</scan>", file=out)
+                print("<scan arg='%s'>" % arg, file=self.stream)
+                print(stream_fmt(res), file=self.stream)
+                print("</scan>", file=self.stream)
     finally:
         scanner.quit.set()
         status = status_template % (scanner.sq_size, scanner.rq_size)

@@ -23,7 +23,7 @@ class RuleContext():
     control over libyara's matching execution.  This class is responsible
     for the conversion of libyara results to python results.
     """
-    def __init__(self, strings, includes, externals):
+    def __init__(self, strings, includes, externals, fast_match):
         """See doc for Rules()"""
         self._callback_error = None
         self._callback = YARACALLBACK(self._callback)
@@ -36,6 +36,7 @@ class RuleContext():
 
         self._process_externals(externals)
         self._context.contents.allow_includes = includes
+        self._context.contents.fast_match = fast_match
 
         for namespace, filename, string in strings:
             yr_push_file_name(self._context, filename)
@@ -116,7 +117,8 @@ class RuleContext():
                                         match.contents.length)
                     string_list.append(dict(data=data,
                         offset=match.contents.offset,
-                        identifier=frombyte(string.contents.identifier)))
+                        identifier=frombyte(string.contents.identifier),
+                        flags=string.contents.flags))
                     match = match.contents.next
             string = string.contents.next
 
@@ -177,7 +179,8 @@ class Rules():
     def __init__(self, paths={},
                  strings=[],
                  includes=True,
-                 externals={}):
+                 externals={},
+                 fast_match=False):
         """Defines a new yara context with specified yara sigs
 
         Options:
@@ -187,6 +190,7 @@ class Rules():
                          (default True)
             externals  - define boolean, integer, or string variables
                          {var:val,...}
+            fast_match - enable fast matching in the YARA context
 
         Note:
             namespace - defines which namespace we're building our rules under
@@ -194,16 +198,17 @@ class Rules():
             filename  - filename which the rules_string came from
             rules_string - the text read from a .yar file
         """
-        self._includes = includes
-        self._externals = externals
         self._strings = copy.copy(strings)
         self.namespaces = set()
-
         self._contexts = {}
         for namespace, path in paths.items():
             self.namespaces.add(namespace)
             with open(path, 'rb') as f:
                 self._strings.append((namespace, path, f.read()))
+        self._context_args = [self._strings,
+                                  includes,
+                                  externals,
+                                  fast_match]
 
     def __str__(self):
         return "Rules + %s" % "\n      + ".join([a[0] for a in self._strings])
@@ -213,7 +218,7 @@ class Rules():
         ident = threading.current_thread().ident
         c = self._contexts.get(ident, None)
         if c is None:
-            c = RuleContext(self._strings, self._includes, self._externals)
+            c = RuleContext(*self._context_args)
             self._contexts[ident] = c
         return c
 
@@ -226,11 +231,12 @@ class Rules():
     def weight(self):
         return self.context.weight()
 
-    def match_path(self, path, externals={}, callback=None):
+    def match_path(self, filepath, externals={}, callback=None):
         """Match a filepath against the compiled rules
+        Required argument:
+           filepath - filepath to match against
 
         Options:
-           path - filepath to match against
            externals - define boolean, integer, or string variables
            callback - provide a callback function which will get called with
                       the match results as they comes in.
@@ -246,15 +252,16 @@ class Rules():
 
         Return a dictionary of {"namespace":[match1,match2,...]}
         """
-        return self.context.match(yr_scan_file, path,
+        return self.context.match(yr_scan_file, filepath,
                                   externals=externals,
                                   callback=callback)
 
     def match_data(self, data, externals={}, callback=None):
         """Match data against the compiled rules
+        Required argument:
+           data - filepath to match against
 
         Options:
-           data - filepath to match against
            externals - define boolean, integer, or string variables
            callback - provide a callback function which will get called with
                       the match results as they comes in.
@@ -276,9 +283,10 @@ class Rules():
 
     def match_proc(self, pid, externals={}, callback=None):
         """Match a process memory against the compiled rules
+        Required argument:
+           pid - process id
 
         Options:
-           pid - process id
            externals - define boolean, integer, or string variables
            callback - provide a callback function which will get called with
                       the match results as they comes in.
@@ -298,20 +306,37 @@ class Rules():
                             externals=externals,
                             callback=callback)
 
-    def match(self, **kwargs):
+    def match(self, filepath=None, pid=None, data=None, **match_kwargs):
         """Match on one of the following: pid= filepath= or data=
+        Require one of the following:
+           filepath - filepath to match against
+           pid - process id
+           data - filepath to match against
+
+        Options:
+            externals - define boolean, integer, or string variables
+            callback - provide a callback function which will get called with
+                      the match results as they comes in.
+             Note #1: If callback is set, the Rules object doesn't bother
+                      storing the match results and this func will return []...
+                      The callback hander needs to deal with individual
+                      matches.
+             Note #2:
+                      The callback can abort the matching sequence by returning
+                      a CALLBACK_ABORT or raising a StopIteration() exception.
+                      To continue, a return object of None or CALLBACK_CONTINUE
+                      is required.
+
         Functionally equivalent to (yara-python.c).match
         """
-        filepath = kwargs.pop('filepath', None)
-        pid = kwargs.pop('pid', None)
-        data = kwargs.pop('data', None)
-
         if filepath is not None:
-            return self.match_path(filepath, **kwargs)
+            return self.match_path(filepath, **match_kwargs)
         elif pid is not None:
-            return self.match_proc(pid, **kwargs)
+            return self.match_proc(pid, **match_kwargs)
         elif data is not None:
-            return self.match_data(data, **kwargs)
+            return self.match_data(data, **match_kwargs)
+        else:
+            raise Exception("matche() missing a required argument")
 
 
 YARA_RULES_ROOT = os.environ.get('YARA_RULES',
@@ -322,8 +347,7 @@ def load_rules(rules_rootpath=YARA_RULES_ROOT,
                namespace_prefix='',
                blacklist=[],
                whitelist=[],
-               includes=True,
-               externals={}):
+               **rules_kwargs):
     """A simple way to build a complex yara Rules object with strings equal to
     [(namespace:filepath:source),...]
 
@@ -351,6 +375,7 @@ def load_rules(rules_rootpath=YARA_RULES_ROOT,
     Rule options:
         includes - allow YARA files to include other YARA files (default True)
         externals - define boolean, integer, or string variables {var:val,...}
+        fast_match - enable fast matching in the YARA context
     """
     whitelist = set(whitelist)
     blacklist = set(blacklist)
@@ -379,10 +404,11 @@ def load_rules(rules_rootpath=YARA_RULES_ROOT,
                     not [a for a in filter(namespace.startswith, whitelist)]):
                 continue
             paths[namespace] = os.path.join(path, filename)
-    return Rules(paths=paths, includes=includes, externals=externals)
+    return Rules(paths=paths, **rules_kwargs)
 
 
-def compile(**kwargs):
+def compile(filepath=None, source=None, fileobj=None, filepaths=None,
+        sources=None, **rules_kwargs):
     """Compiles a YARA rules file and returns an instance of class Rules
 
     Require one of the following:
@@ -395,29 +421,24 @@ def compile(**kwargs):
     Rule options:
         includes - allow YARA files to include other YARA files (default True)
         externals - define boolean, integer, or string variables {var:val,...}
+        fast_match - enable fast matching in the YARA context
 
     Functionally equivalent to (yara-python.c).compile
     """
-    filepath = kwargs.pop('filepath', None)
-    source = kwargs.pop('source', None)
-    fileobj = kwargs.pop('fileobj', None)
-    filepaths = kwargs.pop('filepaths', None)
-    sources = kwargs.pop('sources', None)
-
+    kwargs = rules_kwargs.copy()
     if filepath is not None:
-        return Rules(paths=dict(main=filepath), **kwargs)
+        kwargs['paths'] = dict(main=filepath)
     elif fileobj is not None:
-        return Rules(strings=[('main', '<undef>', fileobj.read())], **kwargs)
+        kwargs['strings'] = [('main', '<undef>', fileobj.read())]
     elif source is not None:
-        return Rules(strings=[('main', '<undef>', source)], **kwargs)
+        kwargs['strings'] = [('main', '<undef>', source)]
     elif sources is not None:
-        strings = [(a, '<undef>', b) for a, b in sources.items()]
-        return Rules(strings=strings, **kwargs)
+        kwargs['strings'] = [(a, '<undef>', b) for a, b in sources.items()]
     elif filepaths is not None:
-        return Rules(paths=filepaths, **kwargs)
+        kwargs['paths'] = filepaths
     else:
-        raise Exception("compile() takes 1 argument")
-
+        raise Exception("compile() missing a required argument")
+    return Rules(**kwargs)
 
 if __name__ == "__main__":
     rules = load_rules()

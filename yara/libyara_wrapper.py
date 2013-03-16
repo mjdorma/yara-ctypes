@@ -559,6 +559,7 @@ yr_get_error_message = libyaradll.yr_get_error_message
 
 
 #void              yr_init();
+libyaradll.yr_init.argtypes = []
 libyaradll.yr_init()
 
 

@@ -269,7 +269,7 @@ def main(args):
         elif opt in ['-i']:
             idents_filter = arg
         elif opt in ['-r', '--rule']:
-            if os.path.exists(arg):
+            if not os.path.exists(arg):
                 print("rule path '%s' does not exist" % arg, file=sys.stderr)
                 return -1
             rule_filepath = arg

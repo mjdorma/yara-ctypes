@@ -1,7 +1,10 @@
-import unittest
-from StringIO import StringIO 
 import sys
 import os
+if sys.version_info[0] < 3:
+    from StringIO import StringIO
+else:
+    from io import StringIO
+import unittest
 
 from yara import scan
 

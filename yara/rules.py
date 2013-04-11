@@ -69,7 +69,8 @@ class RuleContext():
     def _error_report_function(self, filename, line_number, error_message):
         if not filename:
             filename = "<undefined yarfile>"
-        self._error_reports.append((filename, line_number, error_message))
+        self._error_reports.append((frombyte(filename), line_number,
+                                    frombyte(error_message)))
 
     def _callback(self, rule, null):
         try:

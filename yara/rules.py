@@ -37,6 +37,7 @@ class RuleContext():
         self._context = yr_create_context()
 
         self._error_report_function = YARAREPORT(self._error_report_function)
+        self._error_reports = []
         self._context.contents.error_report_function = \
                                     self._error_report_function
 
@@ -50,6 +51,9 @@ class RuleContext():
             self._context.contents.current_namespace = ns
             yr_compile_string(string, self._context)
 
+        if self._error_reports:
+            raise YaraSyntaxError("\n".join(self._error_reports))
+
     def __del__(self):
         self.free()
 
@@ -62,7 +66,8 @@ class RuleContext():
     def _error_report_function(self, filename, line_number, error_message):
         if not filename:
             filename = "<undefined yarfile>"
-        print("%s:%s: %s" % (filename, line_number, error_message))
+        msg = "%s:%s: %s" % (filename, line_number, error_message)
+        self._error_reports.append(msg)
 
     def _callback(self, rule, null):
         try:

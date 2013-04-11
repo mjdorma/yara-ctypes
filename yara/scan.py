@@ -56,7 +56,10 @@ class Scanner:
                                       externals=externals,
                                       fast_match=fast_match)
         else:
-            self._rules = yara.compile(filepath=rule_filepath)
+            self._rules = yara.compile(filepath=rule_filepath,
+                                      includes=True,
+                                      externals=externals,
+                                      fast_match=fast_match)
 
         print(self._rules, file=sys.stderr)
         self._jq = Queue()
@@ -345,6 +348,6 @@ def main(args):
         sys.stderr.write("\b" * len(status) + status)
         print("\nscanned %s items... done." % scanner.scanned, file=sys.stderr)
 
-
+entry = lambda : sys.exit(main(sys.argv[1:]))
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    entry()

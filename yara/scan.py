@@ -65,12 +65,14 @@ class Scanner:
         self._jq = Queue()
         self._rq = Queue()
         self._empty = Event()
+        self._threadpool = []
         self.scanned = 0
         self.quit = Event()
 
         for i in range(thread_pool):
             t = Thread(target=self._run)
             t.start()
+            self._threadpool.append(t)
 
         if pids:
             for pid in pids:
@@ -118,6 +120,10 @@ class Scanner:
             finally:
                 self._rq.put((a, r))
                 self._jq.task_done()
+
+    def join(self, timeout=None):
+        for t in self._threadpool:
+            t.join(timeout=timeout)
 
     def __iter__(self):
         return self
@@ -344,6 +350,7 @@ def main(args):
                 print("</scan>", file=stream)
     finally:
         scanner.quit.set()
+        scanner.join()
         status = status_template % (scanner.sq_size, scanner.rq_size)
         sys.stderr.write("\b" * len(status) + status)
         print("\nscanned %s items... done." % scanner.scanned, file=sys.stderr)

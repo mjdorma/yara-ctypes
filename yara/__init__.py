@@ -5,6 +5,7 @@
 
 from yara.version import __version__
 from yara.rules import compile
+from yara.rules import YaraSyntaxError 
 from yara.rules import load_rules
 from yara.rules import Rules
 from yara.rules import YARA_RULES_ROOT

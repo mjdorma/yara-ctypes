@@ -367,6 +367,7 @@ def main(args):
         sys.stderr.write("\b" * len(status) + status)
         print("\nscanned %s items... done." % scanner.scanned, file=sys.stderr)
 
+
 entry = lambda : sys.exit(main(sys.argv[1:]))
 if __name__ == "__main__":
     entry()

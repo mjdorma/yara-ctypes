@@ -194,6 +194,9 @@ Output control:
     -i  [ident1,ident2,ident3, ...]
         print matches that contain specific identifiers and filter out the rest
 
+    --simple 
+        print the filepath and the rule which was hit
+
     -e 
         don't output scan errors
 """ % DEFAULT_THREAD_POOL
@@ -224,12 +227,13 @@ def match_filter(tags_filter, idents_filter, res):
 def main(args):
 
     try:
-        opts, args = getopt(args, 'hw:b:t:o:i:d:r:', ['proc',
+        opts, args = getopt(args, 'hw:b:t:o:i:d:er:', ['proc',
                                               'whitelist=',
                                               'blacklist=',
                                               'thread_pool=',
                                               'root=',
                                               'list',
+                                              'simple',
                                               'fmt=',
                                               'rule=',
                                               'fast',
@@ -252,6 +256,7 @@ def main(args):
     stream = sys.stdout
     stream_fmt = str
     output_errors = True 
+    output_simple = False
     tags_filter = None
     idents_filter = None
 
@@ -278,6 +283,8 @@ def main(args):
             stream = open(arg, 'wb')
         elif opt in ['-e']:
             output_errors = False
+        elif opt in ['--simple']:
+            output_simple = True 
         elif opt in ['-t']:
             tags_filter = set(arg.split(','))
         elif opt in ['-i']:
@@ -354,22 +361,31 @@ def main(args):
         status_template = "scan queue: %-7s result queue: %-7s"
         i = 0
         for arg, res in scanner:
-            i += 1
             if i % 20 == 0:
                 status = status_template % (scanner.sq_size, scanner.rq_size)
                 sys.stderr.write("\b" * len(status) + status)
-            print(res)
-            #results are returned as a dict errors are returned as a str trace 
-            if type(res) is dict:
-                res = match_filter(tags_filter, idents_filter, res)
-            else:
-                if output_errors is False:
+            i += 1
+            if not res:
+                continue 
+
+            if output_simple:
+                if type(res) is not dict:
                     continue
-                
-            if res:
-                print("<scan arg='%s'>" % arg, file=stream)
-                print(stream_fmt(res), file=stream)
-                print("</scan>", file=stream)
+                stream.write("%s:" % arg)
+                for namespace, hits in res.iteritems():
+                    for hit in hits:
+                        stream.write(" %s.%s" % (namespace, hit['rule']))
+                stream.write("\n")
+            else:
+                if type(res) is dict:
+                    res = match_filter(tags_filter, idents_filter, res)
+                else:
+                    if output_errors is False:
+                        continue
+                if res:
+                    print("<scan arg='%s'>" % arg, file=stream)
+                    print(stream_fmt(res), file=stream)
+                    print("</scan>", file=stream)
 
     finally:
         scanner.quit.set()

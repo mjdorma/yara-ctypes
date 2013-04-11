@@ -73,8 +73,8 @@ class TestLibYara(unittest.TestCase):
             yr_push_file_name(context, 'bad_rule')
             current = yr_get_current_file_name(context)
             self.assertTrue(current == 'bad_rule')
-            self.assertRaises(YaraSyntaxError, yr_compile_file, bad_rule,
-                    context)
+            errors = yr_compile_file(bad_rule, context)
+            self.assertTrue(errors)
             self.assertEqual(self.err_callback_count, 1)
             #clean up
             yr_destroy_context(context)
@@ -112,8 +112,8 @@ class TestLibYara(unittest.TestCase):
             yr_push_file_name(context, 'bad_rule')
             ns = yr_create_namespace(context, 'badrule')
             context.contents.current_namespace = ns
-            self.assertRaises(YaraSyntaxError, yr_compile_file,
-                    bad_rule, context)
+            errors = yr_compile_file(bad_rule, context)
+            self.assertTrue(errors)
             self.assertEqual(self.err_callback_count, 1)
 
             #clean up

@@ -25,10 +25,10 @@ class TestScanNamespace(unittest.TestCase):
     def test_yara_file(self):
         sys.stderr = StringIO()
         try:
-            scan.main(['-r', os.path.join(TEST_ROOT, 'rules.yar')])
+            scan.main(['-r', os.path.join(TEST_ROOT, 'meta.yar')])
             sys.stderr.seek(0)
             out = sys.stderr.read()
         finally:
             sys.stderr = sys.__stderr__
         
-        self.assertTrue("does not exist" not in out)
+        self.assertTrue("does not exist" not in out, msg="got %s" % out)

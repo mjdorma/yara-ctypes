@@ -196,6 +196,29 @@ class TestYaraBuildnameSpacedRules(unittest.TestCase):
         self.assertTrue(len(rules.namespaces) == 6)
 
 
+class TestStringsParam(unittest.TestCase):
+    """check for consistent behaviour in rules creation from strings"""
+
+    def test_filename_association(self):
+        """test filename is associated with a rule"""
+        source = """
+rule Broken 
+{
+    condition
+        true
+}
+"""
+        rules = yara.Rules(strings=[('main', 'myfile.yar', source),])
+        try:
+            res = rules.match_data("aaa")
+        except yara.YaraSyntaxError, err:
+            f, l, e = err.errors[0]            
+            self.assertEqual(f, 'myfile.yar')
+            self.assertEqual(l, 5)
+        else:
+            self.fail("expected SyntaxError")
+
+
 class TestPrivateRule(unittest.TestCase):
     """ test the private rule behaviour """
 
@@ -287,11 +310,13 @@ rule TestExtern
 }"""
         rules = yara.compile(source=source, externals=dict(ext_var="my test"))
         res = rules.match_data("aaa")
-        self.assertTrue('main' in res)
+        self.assertTrue('main' in res, 
+                    msg='Failed to set ext_var to "my test"')
         self.assertEqual(len(res['main']), 1)
         self.assertTrue(res['main'][0]['rule'], "TestExtern")
         res = rules.match_data("aaa", externals=dict(ext_var="tset ym"))
-        self.assertTrue('main' not in res)
+        self.assertTrue('main' not in res, 
+                    msg='Failed to set ext_var to "tset ym"')
 
     def test_external_bool(self):
         """confirm external bool works """
@@ -303,12 +328,10 @@ rule TestExtern
 }"""
         rules = yara.compile(source=source, externals=dict(ext_var=True))
         res = rules.match_data("aaa")
-        self.assertTrue('main' in res)
+        self.assertTrue('main' in res, msg='Failed to set ext_var to True')
         self.assertEqual(len(res['main']), 1)
         self.assertTrue(res['main'][0]['rule'], "TestExtern")
         res = rules.match_data("aaa", externals=dict(ext_var=False))
-        self.assertTrue('main' not in res)
+        self.assertTrue('main' not in res, 
+                    msg='Failed to set ext_var to False')
 
-
-if __name__ == "__main__":
-    unittest.main()

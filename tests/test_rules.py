@@ -10,7 +10,7 @@ import yara
 from yara.libyara_wrapper import yr_malloc_count
 from yara.libyara_wrapper import yr_free_count
 
-TEST_ROOT = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'rules')
+RULES_ROOT = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'rules')
 
 class TestRulesMemoryLeakHunt(unittest.TestCase):
     "Test create destroy and scan for Rules"""
@@ -19,9 +19,10 @@ class TestRulesMemoryLeakHunt(unittest.TestCase):
         """memory - create multi scan than destroy"""
         sm = yr_malloc_count()
         sf = yr_free_count()
-        rules = yara.load_rules(TEST_ROOT, includes=True)
+        rules = yara.load_rules(RULES_ROOT, includes=True, 
+                blacklist=['broken', 'extern'])
         for i in range(100):
-            matches = rules.match_path(os.path.join(cdir, sys.executable))
+            matches = rules.match_path(sys.executable)
         rules.free()
         del matches
         del rules
@@ -34,7 +35,8 @@ class TestRulesMemoryLeakHunt(unittest.TestCase):
         sm = yr_malloc_count()
         sf = yr_free_count()
         for i in range(100):
-            rules = yara.load_rules(TEST_ROOT, includes=True)
+            rules = yara.load_rules(RULES_ROOT, includes=True, 
+                blacklist=['broken', 'extern'])
             rules.free()
         dsm = yr_malloc_count()
         dsf = yr_free_count()
@@ -45,8 +47,9 @@ class TestRulesMemoryLeakHunt(unittest.TestCase):
         sm = yr_malloc_count()
         sf = yr_free_count()
         for i in range(10):
-            rules = yara.load_rules(TEST_ROOT, includes=True)
-            matches = rules.match_path(os.path.join(cdir, sys.executable))
+            rules = yara.load_rules(RULES_ROOT, includes=True, 
+                blacklist=['broken', 'extern'])
+            matches = rules.match_path(sys.executable)
             rules.free()
         dsm = yr_malloc_count()
         dsf = yr_free_count()
@@ -56,15 +59,16 @@ class TestRulesMemoryLeakHunt(unittest.TestCase):
         """memory - multi-threaded create scan than destroy"""
         def match_rule(rules, path):
             for i in range(10):
-                matches = rules.match_path(os.path.join(cdir, sys.executable))
+                matches = rules.match_path(sys.executable)
             rules.free()
 
         sm = yr_malloc_count()
         sf = yr_free_count()
         for i in range(5):
             #spool up 4 threads
-            rules = yara.load_rules(TEST_ROOT, includes=True)
-            target = os.path.join(cdir, sys.executable)
+            rules = yara.load_rules(RULES_ROOT, includes=True, 
+                blacklist=['broken', 'extern'])
+            target = sys.executable
             tl = []
             for i in range(4):
                 t1 = Thread(target=match_rule, args=[rules, target])
@@ -88,18 +92,18 @@ class TestYaraCompile(unittest.TestCase):
 
     def assert_scan(self, rule):
         res = rule.match(data="song bird")
-        self.assertTrue('main' in res)
-        self.assertTrue(res['main'])
+        hit = res.values()[0][0]
+        self.assertEqual(hit['rule'], 'TestMeta')
 
     def test_compile_filepath(self):
         """compile filepath"""
-        filepath = os.path.join(TEST_ROOT, 'libs.yar')
+        filepath = os.path.join(RULES_ROOT, 'meta.yar')
         rule = yara.compile(filepath=filepath)
         self.assert_scan(rule)
 
     def test_compile_source(self):
         """compile source"""
-        filepath = os.path.join(TEST_ROOT, 'libs.yar')
+        filepath = os.path.join(RULES_ROOT, 'meta.yar')
         with open(filepath, 'rb') as f:
             source = f.read()
         rule = yara.compile(source=source)
@@ -107,67 +111,47 @@ class TestYaraCompile(unittest.TestCase):
 
     def test_compile_fileobj(self):
         """compile fileobj"""
-        filepath = os.path.join(TEST_ROOT, 'libs.yar')
+        filepath = os.path.join(RULES_ROOT, 'meta.yar')
         rule = yara.compile(fileobj=open(filepath, 'rb'))
         self.assert_scan(rule)
 
     def test_compile_filepaths(self):
         """compile filepaths"""
-        filepath = os.path.join(TEST_ROOT, 'libs.yar')
+        filepath = os.path.join(RULES_ROOT, 'meta.yar')
         rule = yara.compile(filepaths=dict(test_ns=filepath))
         self.assert_scan(rule)
 
     def test_compile_sources(self):
         """compile sources"""
-        filepath = os.path.join(TEST_ROOT, 'libs.yar')
+        filepath = os.path.join(RULES_ROOT, 'meta.yar')
         with open(filepath, 'rb') as f:
             source = f.read()
         rule = yara.compile(sources=dict(test_ns=source))
         self.assert_scan(rule)
 
 
-class TestYaraBuildnameSpacedRules(unittest.TestCase):
+class TestYaraBuildNameSpacedRules(unittest.TestCase):
     """ test yara build namespaced rules interface """
-    def setUp(self):
-        self.target = os.path.join(os.path.split(__file__)[0], '..', 'libs',
-                        'windows', 'x86', 'libyara.dll')
 
-    def test_default_load(self):
+    def test_broken_rules_in_namespace(self):
+        """test loading rules when there is a broken definition"""
+        self.assertRaises(yara.YaraSyntaxError, yara.load_rules, 
+                rules_rootpath=RULES_ROOT)
+
+    def test_good_load(self):
         """build ns rules - default load"""
-        rules = yara.load_rules()
-        result = rules.match_path(self.target)
-        self.assertTrue('hbgary.libs' in result)
-
-    def test_changed_root_alternative_prefix(self):
-        """build ns rules - changed root alternative prefix"""
-        rules_rootpath = os.path.join(yara.YARA_RULES_ROOT, 'hbgary')
-        rules = yara.load_rules(rules_rootpath=rules_rootpath,
-                               namespace_prefix='external')
-        result = rules.match_path(self.target)
-        self.assertTrue('external.libs' in result)
-
-    def test_blaklist(self):
-        """build ns rules - test blacklist"""
-        rules = yara.load_rules(blacklist=['hbgary.antide',
-                                           'hbgary.fingerprint'])
-        self.assertTrue('hbgary.antidebug' not in rules.namespaces)
-        self.assertTrue('hbgary.fingerprint' not in rules.namespaces)
-        self.assertTrue('hbgary.libs' in rules.namespaces)
+        rules = yara.load_rules(rules_rootpath=RULES_ROOT,
+                                blacklist=['broken', 'extern'])
+        result = rules.match_data("dogs dog doggy")
+        self.assertTrue('dogs.meta' in result)
 
     def test_whitelist(self):
         """build ns rules - test whitelist"""
-        rules = yara.load_rules(whitelist=['exam', 'hbgary.l'])
-        self.assertTrue('hbgary.libs' in rules.namespaces)
-        self.assertTrue('example.packer_rules' in rules.namespaces)
-        self.assertTrue(len(rules.namespaces) == 2)
-
-    def test_whitelist_blacklist(self):
-        """build ns rules - test whitelist and blacklist"""
-        rules = yara.load_rules(whitelist=['hbgary'],
-                                blacklist=['hbgary.finger', 'hbgary.libs'])
-        self.assertTrue('hbgary.fingerprint' not in rules.namespaces)
-        self.assertTrue('example.packer_rules' not in rules.namespaces)
-        self.assertTrue(len(rules.namespaces) == 6)
+        rules = yara.load_rules(rules_rootpath=RULES_ROOT,
+                whitelist=['private'],
+                blacklist=['broken', 'extern'])
+        self.assertTrue('private' in rules.namespaces)
+        self.assertTrue(len(rules.namespaces) == 1)
 
 
 class TestStringsParam(unittest.TestCase):

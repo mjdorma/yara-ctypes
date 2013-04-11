@@ -359,7 +359,6 @@ YARA_RULES_ROOT = os.environ.get('YARA_RULES',
 
 
 def load_rules(rules_rootpath=YARA_RULES_ROOT,
-               namespace_prefix='',
                blacklist=[],
                whitelist=[],
                **rules_kwargs):
@@ -367,8 +366,7 @@ def load_rules(rules_rootpath=YARA_RULES_ROOT,
     [(namespace:filepath:source),...]
 
     YARA rules files found under the rules_rootpath are loaded based on the
-    exclude namespace blacklist or include namespace whitelist.  Namespaces can
-    also be prefixed with an optional label.
+    exclude namespace blacklist or include namespace whitelist. 
 
     i.e.
     Where rules_rootpath = './rules' which contained:
@@ -383,7 +381,6 @@ def load_rules(rules_rootpath=YARA_RULES_ROOT,
 
     Optional YARA rule loading parameters:
        rules_rootpath - root dir to search for YARA rules files
-       namespace_prefix - specify a root name to prefix loaded namespaces
        blacklist - namespaces "starting with" to exclude
        whitelist - namespaces "starting with" to include
 
@@ -403,11 +400,7 @@ def load_rules(rules_rootpath=YARA_RULES_ROOT,
     for path, children, names in os.walk(rules_rootpath):
         relative_path = path[len(rules_rootpath):]
         namespace_base = ".".join(relative_path.split(os.path.sep))
-        if namespace_prefix:
-            if namespace_base:
-                namespace_base = "%s.%s" % (namespace_prefix, namespace_base)
-            else:
-                namespace_base = namespace_prefix
+
         for filename in names:
             name, ext = os.path.splitext(filename)
             if ext != '.yar':
@@ -421,6 +414,7 @@ def load_rules(rules_rootpath=YARA_RULES_ROOT,
             if (whitelist and \
                     not [a for a in filter(namespace.startswith, whitelist)]):
                 continue
+
             paths[namespace] = os.path.join(path, filename)
 
     rules = Rules(paths=paths, **rules_kwargs)

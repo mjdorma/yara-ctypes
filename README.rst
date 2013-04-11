@@ -96,6 +96,12 @@ with GitHub's issues system.
 Change log
 ==========
 
+version 1.6.5 (12/04/2013)
+
+* more tech in scan
+* improved test
+* bug fixes
+
 version 1.6.4 (11/04/2013)
 
 * supports py3.3 

@@ -480,11 +480,16 @@ libyaradll.yr_compile_string.restype = c_int
 libyaradll.yr_compile_string.argtypes = [c_char_p, POINTER(YARA_CONTEXT)]
 def yr_compile_string(rules_string, context):
     errors = libyaradll.yr_compile_string(tobyte(rules_string), context)
-    if errors:
-        error_line = context.contents.last_error_line
-        error_message = (c_char * 256)()
-        yr_get_error_message(context, error_message, 256)
-        raise YaraSyntaxError(error_message.value)
+# TODO:  Couldn't easily identify the yara filename for this error
+#        -->> now handled in rules.py with the self._error_reports check
+#   if errors:
+#       error_line = context.contents.last_error_line
+#       error_message = (c_char * 256)()
+#       yr_get_error_message(context, error_message, 256)
+#       filename = yr_get_current_file_name(context)
+#       #filename = context.contents.file_name_stack[context.contents.file_name_stack_ptr - 1 ]
+#       msg = "Error %s:%s %s" % (filename, error_line, error_message.value)
+#       raise YaraSyntaxError(msg)
 
 
 #int               yr_compile_file(FILE* rules_file, YARA_CONTEXT* context);

@@ -67,6 +67,11 @@ setup(
     long_description=open('README.rst').read(),
     license="Apache Software Licence",
     install_requires = [],
+    entry_points={
+        'console_scripts': [
+            'yara = yara.scan:entry'
+            ]
+    },
     platforms=['cygwin', 'win', 'linux'],
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',

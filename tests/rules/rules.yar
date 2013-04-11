@@ -1,7 +1,4 @@
 
-
-
-
 rule TestMeta
 {
     meta:

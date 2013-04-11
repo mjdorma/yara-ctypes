@@ -14,6 +14,7 @@ else:
 import json
 import pickle
 import marshal
+import time
 
 import yara
 
@@ -360,6 +361,7 @@ def main(args):
     try:
         status_template = "scan queue: %-7s result queue: %-7s"
         i = 0
+        stime = time.time()
         for arg, res in scanner:
             if i % 20 == 0:
                 status = status_template % (scanner.sq_size, scanner.rq_size)
@@ -392,7 +394,8 @@ def main(args):
         scanner.join()
         status = status_template % (scanner.sq_size, scanner.rq_size)
         sys.stderr.write("\b" * len(status) + status)
-        print("\nscanned %s items... done." % scanner.scanned, file=sys.stderr)
+        print("\nscanned %s items in %0.02fs... done." % (scanner.scanned,
+                time.time()-stime), file=sys.stderr)
 
 
 entry = lambda : sys.exit(main(sys.argv[1:]))

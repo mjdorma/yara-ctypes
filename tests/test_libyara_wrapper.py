@@ -6,6 +6,7 @@ import doctest
 import yara
 from yara.libyara_wrapper import *
 
+TEST_ROOT = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'rules')
 
 class TestLibYara(unittest.TestCase):
 
@@ -22,8 +23,7 @@ class TestLibYara(unittest.TestCase):
     def test_build_context_with_a_rule(self):
         """compile and destroy a good rule"""
 
-        cdir = yara.YARA_RULES_ROOT
-        good_rule = os.path.join(cdir, 'example', 'packer_rules.yar')
+        good_rule = os.path.join(TEST_ROOT, 'private.yar')
         error_report_function = YARAREPORT(self.error_report_function)
 
         #create and destroy a bunch of contexts
@@ -55,8 +55,7 @@ class TestLibYara(unittest.TestCase):
 
     def test_demonstrate_memleak_when_error(self):
         """compile broken rule"""
-        cdir = os.path.split(__file__)[0]
-        bad_rule = os.path.join(cdir, 'broken_rules.yar')
+        bad_rule = os.path.join(TEST_ROOT, 'broken.yar')
         error_report_function = YARAREPORT(self.error_report_function)
 
         #create and destroy a bunch of contexts
@@ -86,9 +85,9 @@ class TestLibYara(unittest.TestCase):
         """compile a good rule followed by a broken rule"""
 
         cdir = yara.YARA_RULES_ROOT
-        good_rule = os.path.join(cdir, 'example', 'packer_rules.yar')
+        good_rule = os.path.join(TEST_ROOT, 'private.yar')
         cdir = os.path.split(__file__)[0]
-        bad_rule = os.path.join(cdir, 'broken_rules.yar')
+        bad_rule = os.path.join(TEST_ROOT, 'broken.yar')
         error_report_function = YARAREPORT(self.error_report_function)
 
         #create and destroy a bunch of contexts

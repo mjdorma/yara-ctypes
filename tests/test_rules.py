@@ -10,40 +10,31 @@ import yara
 from yara.libyara_wrapper import yr_malloc_count
 from yara.libyara_wrapper import yr_free_count
 
+TEST_ROOT = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'rules')
 
 class TestRulesMemoryLeakHunt(unittest.TestCase):
     "Test create destroy and scan for Rules"""
 
     def test_build_rules_and_scan(self):
         """memory - create multi scan than destroy"""
-
-        cdir = os.path.split(__file__)[0]
-        rules_rootpath = os.path.join(cdir, 'rules')
         sm = yr_malloc_count()
         sf = yr_free_count()
-        rules = yara.load_rules(rules_rootpath,
-                    includes=True)
-        for i in range(1000):
+        rules = yara.load_rules(TEST_ROOT, includes=True)
+        for i in range(100):
             matches = rules.match_path(os.path.join(cdir, sys.executable))
         rules.free()
         del matches
         del rules
-
         dsm = yr_malloc_count()
         dsf = yr_free_count()
         self.assertEqual(dsm, dsf)
 
     def test_create_destroy(self):
         """memory - create and destroy loop"""
-
-        cdir = os.path.split(__file__)[0]
-        rules_rootpath = os.path.join(cdir, 'rules')
-
         sm = yr_malloc_count()
         sf = yr_free_count()
         for i in range(100):
-            rules = yara.load_rules(rules_rootpath,
-                    includes=True)
+            rules = yara.load_rules(TEST_ROOT, includes=True)
             rules.free()
         dsm = yr_malloc_count()
         dsf = yr_free_count()
@@ -51,17 +42,12 @@ class TestRulesMemoryLeakHunt(unittest.TestCase):
 
     def test_create_destroy_and_scan(self):
         """memory - create and destroy for each scan"""
-
-        cdir = os.path.split(__file__)[0]
-        rules_rootpath = os.path.join(cdir, 'rules')
         sm = yr_malloc_count()
         sf = yr_free_count()
         for i in range(10):
-            rules = yara.load_rules(rules_rootpath,
-                    includes=True)
+            rules = yara.load_rules(TEST_ROOT, includes=True)
             matches = rules.match_path(os.path.join(cdir, sys.executable))
             rules.free()
-
         dsm = yr_malloc_count()
         dsf = yr_free_count()
         self.assertEqual(dsm, dsf)
@@ -73,14 +59,11 @@ class TestRulesMemoryLeakHunt(unittest.TestCase):
                 matches = rules.match_path(os.path.join(cdir, sys.executable))
             rules.free()
 
-        cdir = os.path.split(__file__)[0]
-        rules_rootpath = os.path.join(cdir, 'rules')
         sm = yr_malloc_count()
         sf = yr_free_count()
-
         for i in range(5):
             #spool up 4 threads
-            rules = yara.load_rules(rules_rootpath, includes=True)
+            rules = yara.load_rules(TEST_ROOT, includes=True)
             target = os.path.join(cdir, sys.executable)
             tl = []
             for i in range(4):
@@ -95,7 +78,6 @@ class TestRulesMemoryLeakHunt(unittest.TestCase):
                 t1.join()
                 t2.join()
                 t3.join()
-
         dsm = yr_malloc_count()
         dsf = yr_free_count()
         self.assertEqual(dsm, dsf)
@@ -103,53 +85,45 @@ class TestRulesMemoryLeakHunt(unittest.TestCase):
 
 class TestYaraCompile(unittest.TestCase):
     """test yara compile interface"""
-    def setUp(self):
-        self.target = os.path.join(os.path.split(__file__)[0], '..', 'libs',
-                       'windows', 'x86', 'libyara.dll')
+
+    def assert_scan(self, rule):
+        res = rule.match(data="song bird")
+        self.assertTrue('main' in res)
+        self.assertTrue(res['main'])
 
     def test_compile_filepath(self):
         """compile filepath"""
-        filepath = os.path.join(yara.YARA_RULES_ROOT, 'hbgary', 'libs.yar')
+        filepath = os.path.join(TEST_ROOT, 'libs.yar')
         rule = yara.compile(filepath=filepath)
-        res = rule.match(filepath=self.target)
-        self.assertTrue('main' in res)
-        self.assertTrue(res['main'])
+        self.assert_scan(rule)
 
     def test_compile_source(self):
         """compile source"""
-        filepath = os.path.join(yara.YARA_RULES_ROOT, 'hbgary', 'libs.yar')
+        filepath = os.path.join(TEST_ROOT, 'libs.yar')
         with open(filepath, 'rb') as f:
             source = f.read()
         rule = yara.compile(source=source)
-        res = rule.match_path(self.target)
-        self.assertTrue('main' in res)
-        self.assertTrue(res['main'])
+        self.assert_scan(rule)
 
     def test_compile_fileobj(self):
         """compile fileobj"""
-        filepath = os.path.join(yara.YARA_RULES_ROOT, 'hbgary', 'libs.yar')
+        filepath = os.path.join(TEST_ROOT, 'libs.yar')
         rule = yara.compile(fileobj=open(filepath, 'rb'))
-        res = rule.match_path(self.target)
-        self.assertTrue('main' in res)
-        self.assertTrue(res['main'])
+        self.assert_scan(rule)
 
     def test_compile_filepaths(self):
         """compile filepaths"""
-        filepath = os.path.join(yara.YARA_RULES_ROOT, 'hbgary', 'libs.yar')
+        filepath = os.path.join(TEST_ROOT, 'libs.yar')
         rule = yara.compile(filepaths=dict(test_ns=filepath))
-        res = rule.match_path(self.target)
-        self.assertTrue('test_ns' in res)
-        self.assertTrue(res['test_ns'])
+        self.assert_scan(rule)
 
     def test_compile_sources(self):
         """compile sources"""
-        filepath = os.path.join(yara.YARA_RULES_ROOT, 'hbgary', 'libs.yar')
+        filepath = os.path.join(TEST_ROOT, 'libs.yar')
         with open(filepath, 'rb') as f:
             source = f.read()
         rule = yara.compile(sources=dict(test_ns=source))
-        res = rule.match_path(self.target)
-        self.assertTrue('test_ns' in res)
-        self.assertTrue(res['test_ns'])
+        self.assert_scan(rule)
 
 
 class TestYaraBuildnameSpacedRules(unittest.TestCase):

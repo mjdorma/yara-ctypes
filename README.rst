@@ -69,8 +69,8 @@ Ubuntu 11.10 |build_status|:
  + CPython 2.6 (32bit)
  + CPython 2.7 (32bit)
  + CPython 3.2 (32bit)
- + CPython 3.3 (32bit)
- + PyPy 1.9.0 (32bit) <- dropped in latest
+ + CPython 3.3 (32bit) *outstanding bug seems to be shared with PyPy
+ + PyPy 1.9.0 (32bit)  *outstanding bug
 
 Windows 7:
 
@@ -96,10 +96,8 @@ with GitHub's issues system.
 Change log
 ==========
 
-version 1.6.4 (11/04/2013)
+version 1.6.5 (11/04/2013)
 
-* dropped support for pypi. (interesting issues when testing ext vars, may fix
-  support in the future.)
 * supports py3.3 
 * additional test
 * improved scan interface 

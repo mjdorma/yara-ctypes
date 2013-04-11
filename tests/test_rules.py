@@ -211,7 +211,7 @@ rule Broken
         rules = yara.Rules(strings=[('main', 'myfile.yar', source),])
         try:
             res = rules.match_data("aaa")
-        except yara.YaraSyntaxError, err:
+        except yara.YaraSyntaxError as err:
             f, l, e = err.errors[0]            
             self.assertEqual(f, 'myfile.yar')
             self.assertEqual(l, 5)

@@ -92,7 +92,7 @@ class TestYaraCompile(unittest.TestCase):
 
     def assert_scan(self, rule):
         res = rule.match(data="song bird")
-        hit = res.values()[0][0]
+        hit = list(res.values())[0][0]
         self.assertEqual(hit['rule'], 'TestMeta')
 
     def test_compile_filepath(self):
@@ -112,7 +112,8 @@ class TestYaraCompile(unittest.TestCase):
     def test_compile_fileobj(self):
         """compile fileobj"""
         filepath = os.path.join(RULES_ROOT, 'meta.yar')
-        rule = yara.compile(fileobj=open(filepath, 'rb'))
+        with open(filepath, 'rb') as f:
+            rule = yara.compile(fileobj=f)
         self.assert_scan(rule)
 
     def test_compile_filepaths(self):

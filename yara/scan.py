@@ -177,7 +177,7 @@ Load rules control:
     --root=(env[YARA_RULES] or <pkg>/yara/rules/)
         set the YARA_RULES path (path to the root of the rules directory)
   
-  filepath:
+  yarafile:
     -r, --rule=
         Use the rule file specified by this input argument and ignore the
         YARA namespaces
@@ -251,7 +251,7 @@ def main(args):
     list_rules = False
     stream = sys.stdout
     stream_fmt = str
-    output_errors = False
+    output_errors = True 
     tags_filter = None
     idents_filter = None
 
@@ -260,10 +260,10 @@ def main(args):
             print(__help__)
             return 0
         elif opt in ['--root']:
-            if os.path.exists(arg):
+            if not os.path.exists(arg):
                 print("root path '%s' does not exist" % arg, file=sys.stderr)
                 return -1
-            rules_rootpath = arg
+            rules_rootpath = os.path.abspath(arg)
         elif opt in ['-d']:
             try:
                 externals.update(eval("dict(%s)" % arg))
@@ -322,15 +322,16 @@ def main(args):
                     pids.append(int(pid))
                 except ValueError:
                     print("PID %s was not an int" % (pid), file=sys.stderr)
-
-    if list_rules is True:
-        rules = yara.load_rules(rules_rootpath=rules_rootpath,
+    
+    try:
+        if list_rules is True:
+            rules = yara.load_rules(rules_rootpath=rules_rootpath,
                                 blacklist=blacklist,
                                 whitelist=whitelist)
-        print(rules)
-        return 0
+            print(rules)
+            return 0
 
-    scanner = Scanner(paths=paths, pids=pids,
+        scanner = Scanner(paths=paths, pids=pids,
                       rules_rootpath=rules_rootpath,
                       whitelist=whitelist,
                       blacklist=blacklist,
@@ -338,6 +339,16 @@ def main(args):
                       thread_pool=thread_pool,
                       fast_match=fast_match,
                       externals=externals)
+    except yara.YaraSyntaxError as err:
+        print("Failed to load rules with the following error(s):\n%s" % \
+                err.message)
+        blacklist = set()
+        for f, _, _ in err.errors:
+            f = os.path.splitext(f[len(rules_rootpath)+1:])[0]
+            blacklist.add(f.replace(os.path.sep, '.'))
+        print("\nYou could blacklist guilty using:")
+        print(" --blacklist=%s" % ",".join(blacklist))
+        return -1
 
     try:
         status_template = "scan queue: %-7s result queue: %-7s"
@@ -347,7 +358,7 @@ def main(args):
             if i % 20 == 0:
                 status = status_template % (scanner.sq_size, scanner.rq_size)
                 sys.stderr.write("\b" * len(status) + status)
-
+            print(res)
             #results are returned as a dict errors are returned as a str trace 
             if type(res) is dict:
                 res = match_filter(tags_filter, idents_filter, res)

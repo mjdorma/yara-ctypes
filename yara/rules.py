@@ -219,6 +219,7 @@ class Rules():
             self.namespaces.add(namespace)
             with open(path, 'rb') as f:
                 self._strings.append((namespace, path, f.read()))
+
         self._context_args = [self._strings,
                                   includes,
                                   externals,
@@ -411,14 +412,21 @@ def load_rules(rules_rootpath=YARA_RULES_ROOT,
             name, ext = os.path.splitext(filename)
             if ext != '.yar':
                 continue
-            namespace = "%s.%s" % (namespace_base, name)
+            if namespace_base:
+                namespace = "%s.%s" % (namespace_base, name)
+            else:
+                namespace = name
             if [a for a in filter(namespace.startswith, blacklist)]:
                 continue
             if (whitelist and \
                     not [a for a in filter(namespace.startswith, whitelist)]):
                 continue
             paths[namespace] = os.path.join(path, filename)
-    return Rules(paths=paths, **rules_kwargs)
+
+    rules = Rules(paths=paths, **rules_kwargs)
+    c = rules.context
+    rules.free()
+    return rules
 
 
 def compile(filepath=None, source=None, fileobj=None, filepaths=None,
@@ -452,7 +460,12 @@ def compile(filepath=None, source=None, fileobj=None, filepaths=None,
         kwargs['paths'] = filepaths
     else:
         raise Exception("compile() missing a required argument")
-    return Rules(**kwargs)
+
+    rules = Rules(**kwargs)
+    c = rules.context
+    rules.free()
+    return rules
+
 
 if __name__ == "__main__":
     rules = load_rules()

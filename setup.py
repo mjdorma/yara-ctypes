@@ -69,7 +69,7 @@ setup(
     install_requires = [],
     entry_points={
         'console_scripts': [
-            'yara = yara.scan:entry'
+            'yara-ctypes = yara.scan:entry'
             ]
     },
     platforms=['cygwin', 'win', 'linux'],

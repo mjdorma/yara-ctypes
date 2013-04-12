@@ -13,7 +13,8 @@ class TestLibYara(unittest.TestCase):
     def error_report_function(self, filename, line_number, error_message):
         #if not filename:
         #    filename = "_"
-        #print "%s:%s: %s"%(filename, line_number, error_message)
+        print "test hooked error %s:%s: %s"%(filename, 
+                            line_number, error_message)
         self.err_callback_count += 1
 
     def test_readme_doctest(self):
@@ -37,14 +38,17 @@ class TestLibYara(unittest.TestCase):
 
             #add the good rule file and make sure it doesn't raise or callback
             yr_push_file_name(context, 'good_rule')
+            self.err_callback_count = 0
+           
             ns = yr_create_namespace(context, 'test')
             context.contents.current_namespace = ns
-            self.err_callback_count = 0
-
             yr_compile_file(good_rule, context)
+            
             ns = yr_create_namespace(context, 'test2')
             context.contents.current_namespace = ns
+            yr_push_file_name(context, 'good_rule')
             yr_compile_file(good_rule, context)
+            
             self.assertEqual(self.err_callback_count, 0)
 
             #clean up
@@ -84,9 +88,7 @@ class TestLibYara(unittest.TestCase):
     def test_demonstrate_memleak_good_and_bad_load(self):
         """compile a good rule followed by a broken rule"""
 
-        cdir = yara.YARA_RULES_ROOT
         good_rule = os.path.join(TEST_ROOT, 'private.yar')
-        cdir = os.path.split(__file__)[0]
         bad_rule = os.path.join(TEST_ROOT, 'broken.yar')
         error_report_function = YARAREPORT(self.error_report_function)
 

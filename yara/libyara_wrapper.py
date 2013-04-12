@@ -212,11 +212,21 @@ STRING_LIST_ENTRY._fields_ = [
             ]
 
 
+class RULE_LIST_ENTRY(Structure):
+    pass
+RULE_LIST_ENTRY._fields_ = [
+            ('rule', POINTER(RULE)),
+            ('next', POINTER(RULE_LIST_ENTRY)),
+            ]
+
+
+RULE_LIST_HASH_TABLE_SIZE = 10007
 class RULE_LIST(Structure):
     pass
 RULE_LIST._fields_ = [
             ('head', POINTER(RULE)),
             ('tail', POINTER(RULE)),
+            ('hash_table', (RULE_LIST_ENTRY * RULE_LIST_HASH_TABLE_SIZE)),
             ]
 
 
@@ -273,6 +283,9 @@ YARA_CONTEXT._fields_ = [
 
             ('file_name_stack', (c_char_p * MAX_INCLUDE_DEPTH)),
             ('file_name_stack_ptr', c_int),
+
+            ('file_stack', (c_void_p * MAX_INCLUDE_DEPTH)),
+            ('file_stack_prt', c_int),
 
             ('last_error_extra_info', (c_char * 256)),
 
@@ -473,6 +486,9 @@ libyaradll.yr_pop_file_name.restype = None
 libyaradll.yr_pop_file_name.argtypes = [POINTER(YARA_CONTEXT)]
 yr_pop_file_name = libyaradll.yr_pop_file_name
 
+#int               yr_push_file(YARA_CONTEXT* context, FILE* fh);
+
+#FILE*             yr_pop_file(YARA_CONTEXT* context);
 
 #int               yr_compile_string(const char* rules_string,
 #                                   YARA_CONTEXT* context);
@@ -571,12 +587,14 @@ libyaradll.yr_init()
 
 #### EXTRA Goodness!
 
-if hasattr(libyaradll, 'yr_free_matches'):
-    libyaradll.yr_free_matches.restype = None
-    libyaradll.yr_free_matches.argtypes = [POINTER(YARA_CONTEXT)]
-    yr_free_matches = libyaradll.yr_free_matches
-else:
-    raise NotImplementedError("Add yr_free_matches to libyara >>README""")
+#if hasattr(libyaradll, 'yr_free_matches'):
+#    libyaradll.yr_free_matches.restype = None
+#    libyaradll.yr_free_matches.argtypes = [POINTER(YARA_CONTEXT)]
+#    yr_free_matches = libyaradll.yr_free_matches
+#else:
+#    raise NotImplementedError("Add yr_free_matches to libyara >>README""")
+def yr_free_matches(*a,**k):
+    return
 
 
 #See if we have yr_malloc_count and yr_free_count for testing?

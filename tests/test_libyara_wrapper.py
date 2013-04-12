@@ -13,8 +13,8 @@ class TestLibYara(unittest.TestCase):
     def error_report_function(self, filename, line_number, error_message):
         #if not filename:
         #    filename = "_"
-        print "test hooked error %s:%s: %s"%(filename, 
-                            line_number, error_message)
+        print("test hooked error %s:%s: %s"%(filename, 
+                            line_number, error_message))
         self.err_callback_count += 1
 
     def test_readme_doctest(self):

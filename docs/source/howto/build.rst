@@ -57,7 +57,7 @@ Building for Ubuntu
 
 Install the development pre-requisites:: 
 
-    > sudo apt-get install flex libpcre3-dev pcre bison
+    > sudo apt-get install build-essential flex libpcre3-dev libpcre3 bison
 
 First attempt::
 

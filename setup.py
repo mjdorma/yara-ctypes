@@ -35,7 +35,7 @@ arch, exetype = platform.architecture()
 system = platform.system().lower()
 machine = platform.machine().lower()
 
-if system == 'linux' and machine in ['i686', 'x86']:
+if machine in ['i686', 'x86']:
     machine = 'x86_32'
 
 if system == 'windows':

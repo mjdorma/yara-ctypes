@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-from distribute_setup import use_setuptools
-use_setuptools()
 
 from setuptools import setup
 import re
@@ -35,6 +32,9 @@ arch, exetype = platform.architecture()
 system = platform.system().lower()
 machine = platform.machine().lower()
 
+if system == 'linux' and machine in ['i686', 'x86']:
+    machine = 'x86_32'
+
 if system == 'windows':
     ext = '.dll'
 else:
@@ -48,10 +48,6 @@ if os.path.exists(libyara_path):
     else:
         install_libdir = os.path.join(sys.prefix, 'lib')
     data_files.append((install_libdir, [libyara_path]))
-else:
-    print("WARNING: Could not find %s" % libyara_path)
-    print("You need to 'make install' libyara for this system/machine")
-    print("See http://pythonhosted.org/yara/ for help")
 
 setup(
     name="yara",
@@ -91,3 +87,10 @@ setup(
     ],
     test_suite="tests"
 )
+
+if not data_files:
+    print("\nWARNING: Could not find %s" % libyara_path)
+    print("You need to 'make install' libyara for this system/machine")
+    print("See http://pythonhosted.org/yara/ for help")
+
+

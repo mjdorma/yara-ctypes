@@ -587,14 +587,12 @@ libyaradll.yr_init()
 
 #### EXTRA Goodness!
 
-#if hasattr(libyaradll, 'yr_free_matches'):
-#    libyaradll.yr_free_matches.restype = None
-#    libyaradll.yr_free_matches.argtypes = [POINTER(YARA_CONTEXT)]
-#    yr_free_matches = libyaradll.yr_free_matches
-#else:
-#    raise NotImplementedError("Add yr_free_matches to libyara >>README""")
-def yr_free_matches(*a,**k):
-    return
+if hasattr(libyaradll, 'yr_free_matches'):
+    libyaradll.yr_free_matches.restype = None
+    libyaradll.yr_free_matches.argtypes = [POINTER(YARA_CONTEXT)]
+    yr_free_matches = libyaradll.yr_free_matches
+else:
+    raise NotImplementedError("Add yr_free_matches to libyara >>README""")
 
 
 #See if we have yr_malloc_count and yr_free_count for testing?

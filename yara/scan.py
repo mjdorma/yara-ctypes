@@ -26,28 +26,30 @@ A command line YARA rules scanning utility...
 
 DEFAULT_THREAD_POOL = 4
 
+class Scanner(object):
+    __no_enqueuer = object()
+    enqueuer = __no_enqueuer
 
-class Scanner:
-    """Scan process IDs or file paths."""
-    def __init__(self, pids=[], paths=[],
-                       rules_rootpath=yara.YARA_RULES_ROOT,
+    def __init__(self, rules_rootpath=yara.YARA_RULES_ROOT,
                        whitelist=[],
                        blacklist=[],
                        rule_filepath=None,
                        thread_pool=DEFAULT_THREAD_POOL,
                        fast_match=False,
-                       externals={}):
+                       externals={}, **kwargs):
         """Scanner yields scan results in a tuple of (path|pid, result)
-
         kwargs:
-            pids - list of process ids to scan
-            paths - globbed out list of paths to scan
             rules_rootpath - path to the root of the rules directory
             whitelist - whitelist of rules to use in scanner
             blacklist - blacklist of rules to not use in scanner
+            rule_filepath=None,
             thread_pool - number of threads to use in scanner
             fast_match - scan fast True / False 
             externals - externally defined variables             
+
+        Note: 
+            define an enqueuer function if the enqueue operation will take
+            a long time
         """
         if rule_filepath is None:
             self._rules = yara.load_rules(rules_rootpath=rules_rootpath,
@@ -61,8 +63,6 @@ class Scanner:
                                       includes=True,
                                       externals=externals,
                                       fast_match=fast_match)
-
-        print(self._rules, file=sys.stderr)
         self._jq = Queue()
         self._rq = Queue()
         self._empty = Event()
@@ -74,21 +74,14 @@ class Scanner:
             t = Thread(target=self._run)
             t.start()
             self._threadpool.append(t)
-
-        if pids:
-            for pid in pids:
-                self._jq.put((self._rules.match_proc, pid))
-        else:
-            for path in paths:
-                for p in glob(path):
-                    if os.path.isdir(p):
-                        for dirpath, dirnames, filenames in os.walk(p):
-                            for filename in filenames:
-                                a = os.path.join(dirpath, filename)
-                                self._jq.put((self._rules.match_path, a))
-                    else:
-                        self._jq.put((self._rules.match_path, p))
-        self._jq.put(None)
+        
+        if self.enqueuer != self.__no_enqueure:
+            self._enqueuer_thread = Thread(target=self.enqueuer)
+            self._enqueuer_thread.start()
+    
+    @property
+    def rules(self):
+        return self._rules
 
     @property
     def sq_size(self):
@@ -99,6 +92,20 @@ class Scanner:
     def rq_size(self):
         """contains the current result queue size"""
         return self._rq.unfinished_tasks
+
+    def enqueue_path(self, tag, filepath, **match_kwargs):
+        self._jq.put((self.rules.match_path, tag, (filepath,), match_kwargs))
+
+    def enqueue_data(self, tag, data, **match_kwargs):
+        self._jq.put((self.rules.match_data, tag, (data,), match_kwargs))
+
+    def enqueue_pid(self, tag, pid, **match_kwargs):
+        self._jq.put((self.rules.match_pid, tag, (pid,), match_kwargs))
+
+    def enqueue_end(self):
+        """queue the exit condition.  Threads will complete once 
+        they have exausted the queues up to queue end"""
+        self._jq.put(None)
 
     def _run(self):
         while not self._empty.is_set() and not self.quit.is_set():
@@ -114,30 +121,99 @@ class Scanner:
                 break
             try:
                 self.scanned += 1
-                f, a = job
-                r = f(a)
+                f, t, a, k = job
+                r = f(*a, **k)
             except Exception:
                 r = traceback.format_exc()
             finally:
-                self._rq.put((a, r))
+                self._rq.put((t, r))
                 self._jq.task_done()
 
     def join(self, timeout=None):
         for t in self._threadpool:
             t.join(timeout=timeout)
 
+    def is_alive(self):
+        for t in self._threadpool:
+            if t.is_alive():
+                return True
+        return False
+
     def __iter__(self):
-        return self
+        while True:
+            r = self._rq.get()
+            self._rq.task_done()
+            if r is None:
+                break
+            yield r
+        
 
-    def __next__(self):
-        r = self._rq.get()
-        self._rq.task_done()
-        if r is None:
-            raise StopIteration()
-        return r
+class PathScanner(Scanner):
+    def __init__(self, paths=[], recurse_paths=True, **scanner_kwargs):
+        """Enqueue paths for scanning"""
+        self._paths = paths
+        self._recurse_paths = recurse_paths
+        Scanner.__init__(self, **scanner_kwargs)
 
-    def next(self):
-        return self.__next__()
+    def enqueuer(self):
+        for path in self.paths
+            self.enqueue_path(path, path)
+        self.enqueue_end()
+
+    @property
+    def paths(self):
+        if self._recurse_paths == True:
+            listdir = os.walk
+        else:
+            listdir = lambda r: (r, 
+                    filter(lambda f: os.path.isdir(f), os.listdir(r)), 
+                    filter(lambda f: not os.path.isdir(f), os.listdir(r)))
+        for path in self._paths:
+            for p in glob(path):
+                if os.path.isdir(p):
+                    for dirpath, dirnames, filenames in listdir(p):
+                        for filename in filenames:
+                            a = os.path.join(dirpath, filename)
+                            yield a
+                else:
+                    yield p
+
+
+class PidScanner(Scanner):
+    """Enqueue pips for scanning"""
+    def __init__(self, pids=[], **scanner_kwargs):
+        Scanner.__init__(self, **scanner_kwargs)
+        for pid in pids:
+            self.enqueue_pid(tag, pid)
+        self.enqueue_end()
+
+
+DEFAULT_FILE_CHUNK_SIZE = 2**20
+DEFAULT_FILE_READAHEAD_LIMIT = 2**32
+class FileChunkScanner(PathScanner):
+    """Enqueue chunks of data from paths"""
+    def __init__(self, file_chunk_size=DEFAULT_FILE_CHUNK_SIZE,
+                       file_readahead_limit=DEFAULT_FILE_READAHEAD_LIMIT,
+                       **path_scanner_kwargs):
+        self._chunk_size = chunk_size
+        self._max_sq_size = (file_readahead_limit / file_chunk_size) + 1
+        PathScanner.__init__(self, **path_scanner_kwargs)
+
+    def enqueuer(self):
+        for path in self.paths:
+            with open(path, 'rb') as f:
+                data = f.read(self._chunk_size)
+                chunk_id = 0
+                while data:
+                    chunk_start = chunk_id * self._chunk_size
+                    chunk_end = chunk_start + len(data)
+                    tag = "%s[%s:%s]" % (path, chunk_start, chunk_end)
+                    self.enqueue_data(tag, data)
+                    while self.sq_size > self._max_sq_size:
+                        time.sleep(0.1)
+                    data = f.read(self._chunk_size)
+                    chunk_id += 1
+        self.enqueue_end()
 
 
 __help__ = """
@@ -155,7 +231,7 @@ Scan control:
     --ext=
         file extension inclusion filter (comma separate list)
 
-    --thread_pool=%s
+    --thread-pool=%s
         size of the thread pool used for scanning
 
     --fast
@@ -163,6 +239,16 @@ Scan control:
 
     -d <identifier>=<value>
         define external variable.
+
+File scan control:
+    --file-chunk-size=%s
+        size of data in bytes to chop up a file scan
+
+    --file-readhead-limit=%s
+        maximum number of bytes to read ahead when reading file-chunks
+
+    Note: these controls are for file path scanning only and have no effect 
+          when --proc has been specified
 
 Load rules control:
   namespace: 
@@ -200,7 +286,10 @@ Output control:
 
     -e 
         don't output scan errors
-""" % DEFAULT_THREAD_POOL
+""" % (DEFAULT_THREAD_POOL,
+        DEFAULT_FILE_CHUNK_SIZE,
+        DEFAULT_FILEREADAHEAD_LIMIT)
+
 
 def match_filter(tags_filter, idents_filter, res):
     if tags_filter is not None:
@@ -226,33 +315,26 @@ def match_filter(tags_filter, idents_filter, res):
 
 
 def main(args):
-
     try:
         opts, args = getopt(args, 'hw:b:t:o:i:d:er:', ['proc',
                                               'whitelist=',
                                               'blacklist=',
-                                              'thread_pool=',
+                                              'thread-pool=',
                                               'root=',
                                               'list',
                                               'simple',
                                               'fmt=',
                                               'rule=',
                                               'fast',
+                                              'file-chunk-size=',
+                                              'file-readhead-limit=',
                                               'help'])
     except Exception as exc:
         print("Getopt error: %s" % (exc), file=sys.stderr)
         return -1
 
-    whitelist = []
-    blacklist = []
-    rule_filepath = None
-    thread_pool = 4
-    externals = {}
-    fast_match = False
-    pids = []
-    paths = args
-    rules_rootpath = yara.YARA_RULES_ROOT
-    rule_filepath = None
+    ScannerClass = PathScanner
+    scanner_kwargs = {}
     list_rules = False
     stream = sys.stdout
     stream_fmt = str
@@ -265,19 +347,6 @@ def main(args):
         if opt in ['-h', '--help']:
             print(__help__)
             return 0
-        elif opt in ['--root']:
-            if not os.path.exists(arg):
-                print("root path '%s' does not exist" % arg, file=sys.stderr)
-                return -1
-            rules_rootpath = os.path.abspath(arg)
-        elif opt in ['-d']:
-            try:
-                externals.update(eval("dict(%s)" % arg))
-            except SyntaxError:
-                print("external '%s' syntax error" % arg, file=sys.stderr)
-                return -1
-        elif opt in ['--fast']:
-            fast_match = True
         elif opt in ['--list']:
             list_rules = True
         elif opt in ['-o']:
@@ -294,11 +363,11 @@ def main(args):
             if not os.path.exists(arg):
                 print("rule path '%s' does not exist" % arg, file=sys.stderr)
                 return -1
-            rule_filepath = arg
+            scanner_kwargs['rule_filepath'] = arg
         elif opt in ['-w', '--whitelist']:
-            whitelist = arg.split(',')
+            scanner_kwargs['whitelist'] = arg.split(',')
         elif opt in ['b', '--blacklist']:
-            blacklist = arg.split(',')
+            scanner_kwargs['blacklist'] = arg.split(',')
         elif opt in ['--fmt']:
             if arg == 'pickle':
                 stream_fmt = pickle.dumps
@@ -314,14 +383,44 @@ def main(args):
             else:
                 print("unknown output format %s" % arg, file=sys.stderr)
                 return -1
-        elif opt in ['t', '--thread_pool']:
+        elif opt in ['--root']:
+            if not os.path.exists(arg):
+                print("root path '%s' does not exist" % arg, file=sys.stderr)
+                return -1
+            scanner_kwargs['rules_rootpath'] = os.path.abspath(arg)
+        elif opt in ['-d']:
             try:
-                thread_pool = int(arg)
+                if 'externals' not in scanner_kwargs:
+                    scanner_kwargs['externals'] = {}
+                externals.update(eval("dict(%s)" % arg))
+            except SyntaxError:
+                print("external '%s' syntax error" % arg, file=sys.stderr)
+                return -1
+        elif opt in ['--fast']:
+            scanner_kwargs['fast_match'] = True
+        elif opt in ['--file-readahead-limit']:
+            ScannerClass = FileChunkScanner
+            try:
+                scanner_kwargs['file_read_ahead_limit'] = int(arg)
+            except ValueError:
+                print("-t param %s was not an int" % (arg), file=sys.stderr)
+                return -1
+        elif opt in ['--file-chunk-size']:
+            ScannerClass = FileChunkScanner
+            try:
+                scanner_kwargs['file_chunk_size'] = int(arg)
+            except ValueError:
+                print("-t param %s was not an int" % (arg), file=sys.stderr)
+                return -1
+        elif opt in ['t', '--thread-pool']:
+            try:
+                scanner_kwargs['thread_pool'] = int(arg)
             except ValueError:
                 print("-t param %s was not an int" % (arg), file=sys.stderr)
                 return -1
         elif opt in ['--proc']:
-            paths = []
+            ScannerClass = PidScanner
+            pids = []
             if not args:
                 print("no PIDs specified")
                 return -1
@@ -330,23 +429,20 @@ def main(args):
                     pids.append(int(pid))
                 except ValueError:
                     print("PID %s was not an int" % (pid), file=sys.stderr)
+            scanner_kwargs['pids'] = pids
     
+    if 'pids' not in scanner_kwargs:
+        scanner_kwargs['paths'] = args
+
     try:
         if list_rules is True:
-            rules = yara.load_rules(rules_rootpath=rules_rootpath,
-                                blacklist=blacklist,
-                                whitelist=whitelist)
-            print(rules)
+            scanner_kwargs['thread_pool'] = 0
+            scanner = Scanner(**scanner_kwargs)
+            print(scanner.rules)
             return 0
 
-        scanner = Scanner(paths=paths, pids=pids,
-                      rules_rootpath=rules_rootpath,
-                      whitelist=whitelist,
-                      blacklist=blacklist,
-                      rule_filepath=rule_filepath,
-                      thread_pool=thread_pool,
-                      fast_match=fast_match,
-                      externals=externals)
+        print("Building %s" % ScannerClass.__name__, file=sys.stderr)
+        scanner = ScannerClass(**scanner_kwargs)
     except yara.YaraSyntaxError as err:
         print("Failed to load rules with the following error(s):\n%s" % \
                 err.message)

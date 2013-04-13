@@ -11,6 +11,7 @@ import time
 import yara
 import scan
 
+
 """
 Scanner command line interface.
 
@@ -40,7 +41,7 @@ Scanner control:
     --thread-pool=%s
         size of the thread pool used for scanning
 
-File scan control:
+File control:
     --ext=
         file extension inclusion filter (comma separate list)
 
@@ -76,10 +77,10 @@ Rules control:
         Use the rule file specified by this input argument and ignore the
         YARA namespaces
 
-WebAPI control:
+Web control:
     --max-post-size=%s
 
-Output control:
+Scan output control:
     --fmt=dict
         output format [dict|pprint|json|pickle|marshal]
     -o
@@ -125,13 +126,21 @@ def match_filter(tags_filter, idents_filter, res):
     return res
 
 
-def run_scan(scanner, status_template,
-            output_simple, tags_filter, 
-            idents_filter, stream_fmt):
+STATUS_TEMPLATE = "scan queue: %-7s result queue: %-7s"
+def run_scan(scanner, 
+                stream=None,
+                stream_fmt=str,
+                output_errors=True, 
+                output_simple=False,
+                tags_filter=None,
+                idents_filter=None
+            ):
+    if stream is None:
+        stream = sys.stdout
     i = 0
     for arg, res in scanner:
         if i % 20 == 0:
-            status = status_template % (scanner.sq_size, scanner.rq_size)
+            status = STATUS_TEMPLATE % (scanner.sq_size, scanner.rq_size)
             sys.stderr.write("\b" * len(status) + status)
         i += 1
         if not res:
@@ -155,10 +164,14 @@ def run_scan(scanner, status_template,
                 print("<scan arg='%s'>" % arg, file=stream)
                 print(stream_fmt(res), file=stream)
                 print("</scan>", file=stream)
+    return 0
+
 
 def run_web(scanner):
     web = scan.ScannerWebAPI(scanner) 
     web.run()
+    return 0
+
 
 def main(args):
     try:
@@ -182,14 +195,10 @@ def main(args):
 
     ScannerClass = scan.PathScanner
     scanner_kwargs = {}
-    list_rules = False
-    stream = sys.stdout
-    stream_fmt = str
-    output_errors = True 
-    output_simple = False
-    tags_filter = None
-    idents_filter = None
     mode_web = False
+    list_rules = False
+    run_scan_kwargs = {}
+    rules_rootpath = yara.YARA_RULES_ROOT
 
     for opt, arg in opts:
         if opt in ['-h', '--help']:
@@ -197,16 +206,17 @@ def main(args):
             return 0
         elif opt in ['--list']:
             list_rules = True
+
         elif opt in ['-o']:
-            stream = open(arg, 'wb')
+            run_scan_kwargs['stream'] = open(arg, 'wb')
         elif opt in ['-e']:
-            output_errors = False
+            run_scan_kwargs['output_errors'] = False
         elif opt in ['--simple']:
-            output_simple = True 
+            run_scan_kwargs['output_simple'] = True 
         elif opt in ['-t']:
-            tags_filter = set(arg.split(','))
+            run_scan_kwargs['tags_filter'] = set(arg.split(','))
         elif opt in ['-i']:
-            idents_filter = arg
+            run_scan_kwargs['idents_filter'] = arg
         elif opt in ['--fmt']:
             if arg == 'pickle':
                 stream_fmt = pickle.dumps
@@ -222,6 +232,7 @@ def main(args):
             else:
                 print("unknown output format %s" % arg, file=sys.stderr)
                 return -1
+            run_scan_kwargs['stream_fmt'] = stream_fmt 
 
         elif opt in ['-r', '--rule']:
             if not os.path.exists(arg):
@@ -236,7 +247,8 @@ def main(args):
             if not os.path.exists(arg):
                 print("root path '%s' does not exist" % arg, file=sys.stderr)
                 return -1
-            scanner_kwargs['rules_rootpath'] = os.path.abspath(arg)
+            rules_rootpath = os.path.abspath(arg)
+            scanner_kwargs['rules_rootpath'] = rules_rootpath 
         elif opt in ['-d']:
             try:
                 if 'externals' not in scanner_kwargs:
@@ -309,16 +321,14 @@ def main(args):
 
     try:
         stime = time.time()
-        status_template = "scan queue: %-7s result queue: %-7s"
         if mode_web == False:
-            run_scan(scanner, status_template, output_simple, tags_filter,
-                    idents_filter, stream_fmt)
+            return run_scan(scanner, **run_scan_kwargs) 
         else:
-            run_web(scanner)
+            return run_web(scanner)
     finally:
         scanner.quit.set()
         scanner.join()
-        status = status_template % (scanner.sq_size, scanner.rq_size)
+        status = STATUS_TEMPLATE % (scanner.sq_size, scanner.rq_size)
         sys.stderr.write("\b" * len(status) + status)
         print("\nscanned %s items in %0.02fs... done." % (scanner.scanned,
                 time.time()-stime), file=sys.stderr)

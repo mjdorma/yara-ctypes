@@ -1,25 +1,24 @@
 from __future__ import print_function
-
 import sys
 import os
 import traceback
-import pprint
-from getopt import getopt
 from glob import glob
-from threading import Thread, Event
+from threading import Thread, Event, Lock
 if sys.version_info[0] < 3: #major
     from Queue import Queue, Empty
 else:
     from queue import Queue, Empty
-import json
-import pickle
-import marshal
 import time
+import atexit
+import json
+import httplib
+
+import bottle
 
 import yara
 
 """
-A command line YARA rules scanning utility...
+YARA rules Scanner class definitions 
 
 [mjdorma@gmail.com]
 """
@@ -27,8 +26,7 @@ A command line YARA rules scanning utility...
 DEFAULT_THREAD_POOL = 4
 
 class Scanner(object):
-    __no_enqueuer = object()
-    enqueuer = __no_enqueuer
+    enqueuer = None 
 
     def __init__(self, rules_rootpath=yara.YARA_RULES_ROOT,
                        whitelist=[],
@@ -69,15 +67,19 @@ class Scanner(object):
         self._threadpool = []
         self.scanned = 0
         self.quit = Event()
+        atexit.register(self.quit.set)
 
         for i in range(thread_pool):
             t = Thread(target=self._run)
+            t.daemon = True
             t.start()
             self._threadpool.append(t)
         
-        if self.enqueuer != self.__no_enqueure:
-            self._enqueuer_thread = Thread(target=self.enqueuer)
-            self._enqueuer_thread.start()
+        if self.enqueuer is not None:
+            t = Thread(target=self.enqueuer)
+            t.daemon = True
+            t.start()
+            self._enqueuer_thread = t
     
     @property
     def rules(self):
@@ -104,7 +106,7 @@ class Scanner(object):
 
     def enqueue_end(self):
         """queue the exit condition.  Threads will complete once 
-        they have exausted the queues up to queue end"""
+        they have exhausted the queues up to queue end"""
         self._jq.put(None)
 
     def _run(self):
@@ -139,10 +141,14 @@ class Scanner(object):
                 return True
         return False
 
+    def dequeue(self):
+        r = self._rq.get()
+        self._rq.task_done()
+        return r
+
     def __iter__(self):
         while True:
-            r = self._rq.get()
-            self._rq.task_done()
+            r = self.dequeue()
             if r is None:
                 break
             yield r
@@ -156,7 +162,7 @@ class PathScanner(Scanner):
         Scanner.__init__(self, **scanner_kwargs)
 
     def enqueuer(self):
-        for path in self.paths
+        for path in self.paths:
             self.enqueue_path(path, path)
         self.enqueue_end()
 
@@ -204,296 +210,95 @@ class FileChunkScanner(PathScanner):
             with open(path, 'rb') as f:
                 data = f.read(self._chunk_size)
                 chunk_id = 0
-                while data:
+                while data and not self.quit.is_set():
                     chunk_start = chunk_id * self._chunk_size
                     chunk_end = chunk_start + len(data)
                     tag = "%s[%s:%s]" % (path, chunk_start, chunk_end)
                     self.enqueue_data(tag, data)
-                    while self.sq_size > self._max_sq_size:
+                    while self.sq_size > self._max_sq_size and \
+                                not self.quit.is_set():
                         time.sleep(0.1)
                     data = f.read(self._chunk_size)
                     chunk_id += 1
         self.enqueue_end()
 
 
-__help__ = """
-NAME scan - scan files or processes against yara signatures
+class SyncScanner(Scanner):
+    def __init__(self, **scanner_kwargs):
+        self._scan_id_lock = Lock()
+        self._scan_id = 0
+        self._new_results = Event()
+        self.enqueuer = self.dequeuer # dequeuing thread
+        self.results = {}
+        Scanner.__init__(self, **scanner_kwargs)
 
-SYNOPSIS
-    python scan.py [OPTIONS]... [FILE(s)|PID(s)]...
+    def dequeuer(self):
+        try:
+            while not self.quit.is_set():
+                self._new_results.clear()
+                scan_id, res = self.dequeue()
+                self.results[scan_id] = res
+                self._new_results.set()
+        finally:
+            self._new_results.set()
 
-DESCRIPTION
+    def _sync_scan(self, enqueue_fnc, args, match_kwargs):
+        results = {}
+        scan_ids = []
+        with self._scan_id_lock:
+            for arg in args:
+                self._scan_id += 1
+                scan_id = self._scan_id
+                scan_ids.append(scan_id)
+                results[scan_id] = None
+                a = (scan_id, arg)
+                enqueue_fnc(*a, **match_kwargs)
 
-Scan control:
-    --proc
-        scan PIDs. This indicate that trailing args are PIDS
+        while not self.quit.is_set():
+            for scan_id in scan_ids:
+                if scan_id in self.results:
+                    results[scan_id] = self.results.pop(scan_id)
+                    if len(results) == len(scan_ids):
+                        return [results[i] for i in scan_ids]
+            while not self._new_results.wait(timeout=1):
+                pass
 
-    --ext=
-        file extension inclusion filter (comma separate list)
+    def match_paths(self, path_list, **match_kwargs):
+        return self._sync_scan(self.enqueue_path, path_list, match_kwargs)
 
-    --thread-pool=%s
-        size of the thread pool used for scanning
+    def match_pids(self, pid_list, **match_kwargs):
+        return self._sync_scan(self.enqueue_pid, pid_list, match_kwargs)
 
-    --fast
-        fast matching mode
-
-    -d <identifier>=<value>
-        define external variable.
-
-File scan control:
-    --file-chunk-size=%s
-        size of data in bytes to chop up a file scan
-
-    --file-readhead-limit=%s
-        maximum number of bytes to read ahead when reading file-chunks
-
-    Note: these controls are for file path scanning only and have no effect 
-          when --proc has been specified
-
-Load rules control:
-  namespace: 
-    --list
-        list available YARA namespaces
-
-    -w, --whitelist=
-        whitelist of comma separated YARA namespaces to include in scan
-
-    -b, --blacklist=
-        blacklist of comma separated YARA namespaces to exclude from scan
-
-    --root=(env[YARA_RULES] or <pkg>/yara/rules/)
-        set the YARA_RULES path (path to the root of the rules directory)
-  
-  yarafile:
-    -r, --rule=
-        Use the rule file specified by this input argument and ignore the
-        YARA namespaces
-
-Output control:
-    --fmt=dict
-        output format [dict|pprint|json|pickle|marshal]
-    -o
-        outfile path -> redirect stdout results to outfile
-
-    -t  [tag1,tag2,tag3, ...]
-        print matches that contain specific tags and filter out the rest
-
-    -i  [ident1,ident2,ident3, ...]
-        print matches that contain specific identifiers and filter out the rest
-
-    --simple 
-        print the filepath and the rule which was hit
-
-    -e 
-        don't output scan errors
-""" % (DEFAULT_THREAD_POOL,
-        DEFAULT_FILE_CHUNK_SIZE,
-        DEFAULT_FILEREADAHEAD_LIMIT)
+    def match_data(self, data_list, **match_kwargs):
+        return self._sync_scan(self.enqueue_data, data_list, match_kwargs)
 
 
-def match_filter(tags_filter, idents_filter, res):
-    if tags_filter is not None:
-        new_res = {}
-        for ns, matches in res.iteritems():
-            for match in matches:
-                if tags_filter.intersection(match['tags']):
-                    mlist = new_res.get(ns, [])
-                    mlist.append(match)
-                    new_res[ns] = mlist
-        res = new_res
-    if idents_filter is not None:
-        new_res = {}
-        for ns, matches in res.iteritems():
-            for match in matches:
-                idents = [s['identifier'] for s in match['strings']]
-                if idents_filter.intersection(idents):
-                    mlist = new_res.get(ns, [])
-                    mlist.append(match)
-                    new_res[ns] = mlist
-        res = new_res
-    return res
+MAX_POST_SIZE = 2**20 * 100 # 100 MB
 
+#   class ScannerWebAPI(object):
+#       def __init__(self, max_post_size=MAX_POST_SIZE, scanner):
+#           self._max_post_size = max_post_size 
+#           self.scanner = scanner 
 
-def main(args):
-    try:
-        opts, args = getopt(args, 'hw:b:t:o:i:d:er:', ['proc',
-                                              'whitelist=',
-                                              'blacklist=',
-                                              'thread-pool=',
-                                              'root=',
-                                              'list',
-                                              'simple',
-                                              'fmt=',
-                                              'rule=',
-                                              'fast',
-                                              'file-chunk-size=',
-                                              'file-readhead-limit=',
-                                              'help'])
-    except Exception as exc:
-        print("Getopt error: %s" % (exc), file=sys.stderr)
-        return -1
+#       @bottle.post("scan")
+#       def scan(self):
+#           filenames = []
+#           data = []
+#           bytes_remaining = self._max_post_size
+#           for filename, field in request.files.iteritems():
+#               if bytes_remaining <= 0:
+#                   bottle.abbort(httplib.REQUEST_ENTITY_TOO_LARGE, 
+#                           'POST was > %s bytes' % MAX_POST_SIZE)
+#               d = field.file.read(bytes_remaining)
+#               bytes_remaining -= len(data)
+#               filenames.append(filename)
+#               data.append(d)
 
-    ScannerClass = PathScanner
-    scanner_kwargs = {}
-    list_rules = False
-    stream = sys.stdout
-    stream_fmt = str
-    output_errors = True 
-    output_simple = False
-    tags_filter = None
-    idents_filter = None
+#           try:
+#               res = self.scanner.match_data(data)
+#               results = zip(filenames, res)
+#           except:
+#               bottle.abort(httplib.INTERNAL_SERVER_ERROR, traceback.format_exc())
 
-    for opt, arg in opts:
-        if opt in ['-h', '--help']:
-            print(__help__)
-            return 0
-        elif opt in ['--list']:
-            list_rules = True
-        elif opt in ['-o']:
-            stream = open(arg, 'wb')
-        elif opt in ['-e']:
-            output_errors = False
-        elif opt in ['--simple']:
-            output_simple = True 
-        elif opt in ['-t']:
-            tags_filter = set(arg.split(','))
-        elif opt in ['-i']:
-            idents_filter = arg
-        elif opt in ['-r', '--rule']:
-            if not os.path.exists(arg):
-                print("rule path '%s' does not exist" % arg, file=sys.stderr)
-                return -1
-            scanner_kwargs['rule_filepath'] = arg
-        elif opt in ['-w', '--whitelist']:
-            scanner_kwargs['whitelist'] = arg.split(',')
-        elif opt in ['b', '--blacklist']:
-            scanner_kwargs['blacklist'] = arg.split(',')
-        elif opt in ['--fmt']:
-            if arg == 'pickle':
-                stream_fmt = pickle.dumps
-            elif arg == 'json':
-                stream_fmt = lambda a: json.dumps(a, ensure_ascii=False,
-                                                check_circular=False, indent=4)
-            elif arg == 'pprint':
-                stream_fmt = pprint.pformat
-            elif arg == 'marshal':
-                stream_fmt = marshal.dumps
-            elif arg == 'dict':
-                stream_fmt = str
-            else:
-                print("unknown output format %s" % arg, file=sys.stderr)
-                return -1
-        elif opt in ['--root']:
-            if not os.path.exists(arg):
-                print("root path '%s' does not exist" % arg, file=sys.stderr)
-                return -1
-            scanner_kwargs['rules_rootpath'] = os.path.abspath(arg)
-        elif opt in ['-d']:
-            try:
-                if 'externals' not in scanner_kwargs:
-                    scanner_kwargs['externals'] = {}
-                externals.update(eval("dict(%s)" % arg))
-            except SyntaxError:
-                print("external '%s' syntax error" % arg, file=sys.stderr)
-                return -1
-        elif opt in ['--fast']:
-            scanner_kwargs['fast_match'] = True
-        elif opt in ['--file-readahead-limit']:
-            ScannerClass = FileChunkScanner
-            try:
-                scanner_kwargs['file_read_ahead_limit'] = int(arg)
-            except ValueError:
-                print("-t param %s was not an int" % (arg), file=sys.stderr)
-                return -1
-        elif opt in ['--file-chunk-size']:
-            ScannerClass = FileChunkScanner
-            try:
-                scanner_kwargs['file_chunk_size'] = int(arg)
-            except ValueError:
-                print("-t param %s was not an int" % (arg), file=sys.stderr)
-                return -1
-        elif opt in ['t', '--thread-pool']:
-            try:
-                scanner_kwargs['thread_pool'] = int(arg)
-            except ValueError:
-                print("-t param %s was not an int" % (arg), file=sys.stderr)
-                return -1
-        elif opt in ['--proc']:
-            ScannerClass = PidScanner
-            pids = []
-            if not args:
-                print("no PIDs specified")
-                return -1
-            for pid in args:
-                try:
-                    pids.append(int(pid))
-                except ValueError:
-                    print("PID %s was not an int" % (pid), file=sys.stderr)
-            scanner_kwargs['pids'] = pids
-    
-    if 'pids' not in scanner_kwargs:
-        scanner_kwargs['paths'] = args
+#           return results 
 
-    try:
-        if list_rules is True:
-            scanner_kwargs['thread_pool'] = 0
-            scanner = Scanner(**scanner_kwargs)
-            print(scanner.rules)
-            return 0
-
-        print("Building %s" % ScannerClass.__name__, file=sys.stderr)
-        scanner = ScannerClass(**scanner_kwargs)
-    except yara.YaraSyntaxError as err:
-        print("Failed to load rules with the following error(s):\n%s" % \
-                err.message)
-        blacklist = set()
-        for f, _, _ in err.errors:
-            f = os.path.splitext(f[len(rules_rootpath)+1:])[0]
-            blacklist.add(f.replace(os.path.sep, '.'))
-        print("\nYou could blacklist guilty using:")
-        print(" --blacklist=%s" % ",".join(blacklist))
-        return -1
-
-    try:
-        status_template = "scan queue: %-7s result queue: %-7s"
-        i = 0
-        stime = time.time()
-        for arg, res in scanner:
-            if i % 20 == 0:
-                status = status_template % (scanner.sq_size, scanner.rq_size)
-                sys.stderr.write("\b" * len(status) + status)
-            i += 1
-            if not res:
-                continue 
-
-            if output_simple:
-                if type(res) is not dict:
-                    continue
-                stream.write("%s:" % arg)
-                for namespace, hits in res.iteritems():
-                    for hit in hits:
-                        stream.write(" %s.%s" % (namespace, hit['rule']))
-                stream.write("\n")
-            else:
-                if type(res) is dict:
-                    res = match_filter(tags_filter, idents_filter, res)
-                else:
-                    if output_errors is False:
-                        continue
-                if res:
-                    print("<scan arg='%s'>" % arg, file=stream)
-                    print(stream_fmt(res), file=stream)
-                    print("</scan>", file=stream)
-
-    finally:
-        scanner.quit.set()
-        scanner.join()
-        status = status_template % (scanner.sq_size, scanner.rq_size)
-        sys.stderr.write("\b" * len(status) + status)
-        print("\nscanned %s items in %0.02fs... done." % (scanner.scanned,
-                time.time()-stime), file=sys.stderr)
-
-
-entry = lambda : sys.exit(main(sys.argv[1:]))
-if __name__ == "__main__":
-    entry()

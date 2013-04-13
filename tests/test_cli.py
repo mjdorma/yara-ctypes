@@ -71,6 +71,12 @@ class TestScanNamespace(unittest.TestCase):
         self.assertEqual(ret, 0)
         self.assertTrue("broke" not in stdout) 
 
+    def test_simple(self):
+        ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', BIRD_YAR)
+        self.assertEqual(ret, 0)
+        print stdout
+        print stderr
+
 
 
 

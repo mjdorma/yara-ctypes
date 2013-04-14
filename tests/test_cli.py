@@ -183,6 +183,18 @@ class TestScanNamespace(unittest.TestCase):
         self.assertEqual(len(stdout.splitlines()), 1)
         self.assertTrue("rules/meta.yar: main.Bird01" in stdout)
 
+    def test_scan_filepath_does_not_exist(self):
+        ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', 
+                "paththatdoesnotexist")
+        self.assertEqual(ret, -1)
+        self.assertTrue("Error reading path 'paththatdoesnotexist'" in stderr)
+
+    def test_globbed_path(self):
+        ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', 
+                "tests/*.py")
+        self.assertTrue("tests/test_cli.py: main.Bird01" in stdout)
+        self.assertEqual(ret, 0)
+
     def test_mode_chunk(self):
         ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', 
                 '--mode=chunk', RULES_ROOT)

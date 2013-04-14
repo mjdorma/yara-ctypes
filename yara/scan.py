@@ -158,10 +158,10 @@ class PathScanner(Scanner):
         """Enqueue paths for scanning"""
         self._paths = []
         for path in args:
-            for p in glob(path):
-                if not os.path.exists(p):
-                    raise ValueError("Path %s does not exist" % p)
-                self._paths.append(p)
+            paths = glob(path)
+            if not paths:
+                raise ValueError("Error reading path '%s'" % path)
+            self._paths.extend(paths)
         self._recurse_dirs = recurse_dirs
         self._path_end_include = path_end_include
         self._path_end_exclude = path_end_exclude

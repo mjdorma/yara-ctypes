@@ -96,6 +96,13 @@ with GitHub's issues system.
 Change log
 ==========
 
+version 1.7.0 (15/04/2013)
+
+* ships with builds of yara-1.7 
+* compatibility issues solves with yara-1.7's interface changes
+* major change up and improvement to the scan command line interface. 
+* a lot more testing
+
 version 1.6.5 (12/04/2013)
 
 * more tech in scan

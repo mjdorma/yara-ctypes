@@ -13,8 +13,6 @@ import atexit
 import json
 import httplib
 
-import bottle
-
 import yara
 
 """
@@ -274,7 +272,7 @@ class SyncScanner(Scanner):
 
 
 MAX_POST_SIZE = 2**20 * 100 # 100 MB
-
+#   import bottle
 #   class ScannerWebAPI(object):
 #       def __init__(self, max_post_size=MAX_POST_SIZE, scanner):
 #           self._max_post_size = max_post_size 

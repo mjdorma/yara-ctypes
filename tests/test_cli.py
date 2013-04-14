@@ -104,21 +104,21 @@ class TestScanNamespace(unittest.TestCase):
 
     def test_file_chunks(self):
         ret, stdout, stderr = run_main('-r', BIRD_YAR, 
-                            '--file-chunk-size=10', BIRD_YAR)
+                            '--chunk-size=10', BIRD_YAR)
         self.assertTrue("rules/bird/meta.yar[150:160]" in stdout)
         self.assertEqual(ret, 0)
 
         ret, stdout, stderr = run_main('-r', BIRD_YAR, 
-                            '--file-chunk-size=10', 
-                            '--file-readahead-limit=20', BIRD_YAR)
+                            '--chunk-size=10', 
+                            '--readahead-limit=20', BIRD_YAR)
         self.assertTrue("rules/bird/meta.yar[150:160]" in stdout)
         self.assertEqual(ret, 0)
 
-        ret, stdout, stderr = run_main('--file-chunk-size=a')
+        ret, stdout, stderr = run_main('--chunk-size=a')
         self.assertEqual(ret, -1)
         self.assertEqual("param 'a' was not an int", stderr.strip())
 
-        ret, stdout, stderr = run_main('--file-readahead-limit=a')
+        ret, stdout, stderr = run_main('--readahead-limit=a')
         self.assertEqual(ret, -1)
         self.assertEqual("param 'a' was not an int", stderr.strip())
 

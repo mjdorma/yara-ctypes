@@ -54,11 +54,11 @@ File control:
     --path-contains-include=[str1,str2,str3, ...]
         include path's that contain str (comma separate list)
 
-    --file-chunk-size=%s
+    --chunk-size=%s
         size of data in bytes to chop up a file scan
         note: setting this value implicitly forces --mode=chunk
 
-    --file-readhead-limit=%s
+    --readhead-limit=%s
         maximum number of bytes to read ahead when reading file-chunks
         note: setting this value implicitly forces --mode=chunk
 
@@ -200,7 +200,7 @@ def main(args):
             'recurse-dirs', 
             'path-end-exclude=', 'path-end-include=',
             'path-contains-exclude=', 'path-contains-include=',
-            'file-chunk-size=', 'file-readahead-limit=',
+            'chunk-size=', 'readahead-limit=',
         ])
     except Exception as exc:
         print("Getopt error: %s" % (exc), file=sys.stderr)
@@ -282,14 +282,14 @@ def main(args):
             scanner_kwargs['path_contains_exclude'] = arg.split(',')
         elif opt in ['--recurse-dirs']:
             scanner_kwargs['recurse_dirs'] = True
-        elif opt in ['--file-readahead-limit']:
+        elif opt in ['--readahead-limit']:
             ScannerClass = scan.FileChunkScanner
             try:
                 scanner_kwargs['file_read_ahead_limit'] = int(arg)
             except ValueError:
                 print("param '%s' was not an int" % (arg), file=sys.stderr)
                 return -1
-        elif opt in ['--file-chunk-size']:
+        elif opt in ['--chunk-size']:
             ScannerClass = scan.FileChunkScanner
             try:
                 scanner_kwargs['file_chunk_size'] = int(arg)

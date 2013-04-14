@@ -28,32 +28,42 @@ SYNOPSIS
 
 DESCRIPTION
 
-Scanner control:  
-    default mode is set to scan FILES
-
-    --mode-proc
-        scan PIDs. The trailing args will be treated as PIDS.
-
-    --mode-web
-        turn on a web service that scans files posted to its '/scan/'
-        interface. The trailing args will be treated as the interface 
-        to be bound to IP:PORT
+Scanner control:
+    --mode=file
+        mode options [file|chunk|proc]
+        file  -queues file paths found in FILE(s)
+        chunk -queues chunks of data read from files found in FILE(s)
+        proc  -enqueues PID(s) for process scanning
 
     --thread-pool=%s
-        size of the thread pool used for scanning
+        size of the thread pool used in the Scanner instance 
 
 File control:
-    --ext=
-        file extension inclusion filter (comma separate list)
+    --recurse-dirs 
+        recurse directories specified in FILE(s) 
+
+    --path-end-include=[end1,end2,end3, ...]
+        path endings inclusion filter (comma separate list)
+
+    --path-end-exclude=[end1,end2,end3, ...]
+        path endings exclusion filter (comma separate list)
+
+    --path-contains-exclude=[str1,str2,str3, ...]
+        exclude path's that contain str (comma separate list)
+
+    --path-contains-include=[str1,str2,str3, ...]
+        include path's that contain str (comma separate list)
 
     --file-chunk-size=%s
         size of data in bytes to chop up a file scan
+        note: setting this value implicitly forces --mode=chunk
 
     --file-readhead-limit=%s
         maximum number of bytes to read ahead when reading file-chunks
+        note: setting this value implicitly forces --mode=chunk
 
 Rules control:
-
+  rule:  
     --fast
         fast matching mode
 
@@ -174,35 +184,31 @@ def run_scan(scanner,
     return 0
 
 
-def run_web(scanner):
-    web = scan.ScannerWebAPI(scanner) 
-    web.run()
-    return 0
-
-
 def main(args):
     try:
-        opts, args = getopt(args, 'hw:b:t:o:i:d:er:', ['mode-proc',
-                                              'whitelist=',
-                                              'blacklist=',
-                                              'thread-pool=',
-                                              'root=',
-                                              'list',
-                                              'simple',
-                                              'mode-web',
-                                              'fmt=',
-                                              'rule=',
-                                              'fast',
-                                              'file-chunk-size=',
-                                              'file-readahead-limit=',
-                                              'help'])
+        opts, args = getopt(args, 'hw:b:t:o:i:d:er:', ['help',
+            'list',
+            'mode=',
+            'thread-pool=',
+            'rule=',
+            'root=',
+            'whitelist=',
+            'blacklist=',
+            'fast',
+            'fmt=',
+            'simple',
+            'recurse-dirs', 
+            'path-end-exclude=', 'path-end-include=',
+            'path-contains-exclude=', 'path-contains-include=',
+            'file-chunk-size=', 'file-readahead-limit=',
+        ])
     except Exception as exc:
         print("Getopt error: %s" % (exc), file=sys.stderr)
         return -1
 
     ScannerClass = scan.PathScanner
-    scanner_kwargs = {}
-    mode_web = False
+    scanner_kwargs = dict(args=args)
+
     list_rules = False
     run_scan_kwargs = {}
     rules_rootpath = yara.YARA_RULES_ROOT
@@ -266,6 +272,16 @@ def main(args):
                 return -1
         elif opt in ['--fast']:
             scanner_kwargs['fast_match'] = True
+        elif opt in ['--path-end-include']:
+            scanner_kwargs['path_end_include'] = arg.split(',')
+        elif opt in ['--path-end-exclude']:
+            scanner_kwargs['path_end_exclude'] = arg.split(',')
+        elif opt in ['--path-contains-include']:
+            scanner_kwargs['path_contains_include'] = arg.split(',')
+        elif opt in ['--path-contains-exclude']:
+            scanner_kwargs['path_contains_exclude'] = arg.split(',')
+        elif opt in ['--recurse-dirs']:
+            scanner_kwargs['recurse_dirs'] = True
         elif opt in ['--file-readahead-limit']:
             ScannerClass = scan.FileChunkScanner
             try:
@@ -290,24 +306,16 @@ def main(args):
                 print("--thread-pool value can not be lower than 1",
                         file=sys.stderr)
                 return -1
-        elif opt in ['--mode-proc']:
-            ScannerClass = scan.PidScanner
-            pids = []
-            if not args:
-                print("no PIDs specified")
+        elif opt in ['--mode']:
+            if arg == 'file':
+                ScannerClass = scan.PathScanner
+            elif arg == 'chunk':
+                ScannerClass = scan.FileChunkScanner
+            elif arg == 'proc':
+                ScannerClass = scan.PidScanner
+            else:
+                print("unknown mode %s" % arg, file=sys.stderr)
                 return -1
-            for pid in args:
-                try:
-                    pids.append(int(pid))
-                except ValueError:
-                    print("PID %s was not an int" % (pid), file=sys.stderr)
-            scanner_kwargs['pids'] = pids
-        elif opt in ['--mode-web']:
-            ScannerClass = scan.SyncScanner
-            mode_web = True
-    
-    if 'pids' not in scanner_kwargs:
-        scanner_kwargs['paths'] = args
 
     #build scanner object
     try:
@@ -330,13 +338,13 @@ def main(args):
                 file=sys.stderr)
         print(" --blacklist=%s" % ",".join(blacklist), file=sys.stderr)
         return -1
+    except Exception as exc:
+        print("Failed to build Scanner with error: %s" % exc, file=sys.stderr)
+        return -1
 
     try:
         stime = time.time()
-        if mode_web == False:
-            return run_scan(scanner, **run_scan_kwargs) 
-        else:
-            return run_web(scanner)
+        return run_scan(scanner, **run_scan_kwargs) 
     finally:
         scanner.quit.set()
         scanner.join()

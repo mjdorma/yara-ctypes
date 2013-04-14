@@ -51,6 +51,7 @@ Reference
    :maxdepth: 2
 
    yara/scan.rst
+   yara/cli.rst
    yara/rules.rst
    yara/libyara_wrapper.rst
 

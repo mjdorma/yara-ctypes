@@ -151,10 +151,10 @@ class Scanner(object):
         
 
 class PathScanner(Scanner):
-    def __init__(self, paths=[], recurse_paths=True, **scanner_kwargs):
+    def __init__(self, paths=[], recurse_dirs=False, **scanner_kwargs):
         """Enqueue paths for scanning"""
         self._paths = paths
-        self._recurse_paths = recurse_paths
+        self._recurse_dirs = recurse_dirs
         Scanner.__init__(self, **scanner_kwargs)
 
     def enqueuer(self):
@@ -164,21 +164,26 @@ class PathScanner(Scanner):
 
     @property
     def paths(self):
-        if self._recurse_paths == True:
+        if self._recurse_dirs == True:
             listdir = os.walk
         else:
-            listdir = lambda r: (r, 
+            listdir = lambda r: [(r, 
                     filter(lambda f: os.path.isdir(f), os.listdir(r)), 
-                    filter(lambda f: not os.path.isdir(f), os.listdir(r)))
-        for path in self._paths:
-            for p in glob(path):
-                if os.path.isdir(p):
-                    for dirpath, dirnames, filenames in listdir(p):
-                        for filename in filenames:
-                            a = os.path.join(dirpath, filename)
-                            yield a
-                else:
-                    yield p
+                    filter(lambda f: not os.path.isdir(f), os.listdir(r)))]
+        try:
+            for path in self._paths:
+                for p in glob(path):
+                    if os.path.isdir(p):
+                        for dirpath, dirnames, filenames in listdir(p):
+                            for filename in filenames:
+                                a = os.path.join(dirpath, filename)
+                                yield a
+                    else:
+                        yield p
+        except Exception:
+            print("Fatal error occurred during the paths walk: %s" % \
+                    traceback.format_exc(), file=sys.stderr)
+            self.quit.set()
 
 
 class PidScanner(Scanner):

@@ -5,11 +5,12 @@ import pprint
 from getopt import getopt
 import json
 import pickle
+import traceback
 import marshal
 import time
 
 import yara
-import scan
+from yara import scan
 
 
 """
@@ -150,7 +151,7 @@ def run_scan(scanner,
             if type(res) is not dict:
                 continue
             stream.write("%s:" % arg)
-            for namespace, hits in res.iteritems():
+            for namespace, hits in res.items():
                 for hit in hits:
                     stream.write(" %s.%s" % (namespace, hit['rule']))
             stream.write("\n")
@@ -161,8 +162,14 @@ def run_scan(scanner,
                 if output_errors is False:
                     continue
             if res:
+                try:
+                    formatted_res = stream_fmt(res)
+                except Exception as exc:
+                    exc.error = "Failed to render res\n%s\n%s" % (\
+                                    res, traceback.format_exc())
+                    raise 
                 print("<scan arg='%s'>" % arg, file=stream)
-                print(stream_fmt(res), file=stream)
+                print(formatted_res, file=stream)
                 print("</scan>", file=stream)
     return 0
 
@@ -314,7 +321,7 @@ def main(args):
         scanner = ScannerClass(**scanner_kwargs)
     except yara.YaraSyntaxError as err:
         print("Failed to load rules with the following error(s):\n%s" % \
-                err.message, file=sys.stderr)
+                "\n".join([e for _,_,e in err.errors]), file=sys.stderr)
         blacklist = set()
         for f, _, _ in err.errors:
             f = os.path.splitext(f[len(rules_rootpath)+1:])[0]

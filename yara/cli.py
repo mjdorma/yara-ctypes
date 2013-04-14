@@ -187,7 +187,7 @@ def main(args):
                                               'rule=',
                                               'fast',
                                               'file-chunk-size=',
-                                              'file-readhead-limit=',
+                                              'file-readahead-limit=',
                                               'help'])
     except Exception as exc:
         print("Getopt error: %s" % (exc), file=sys.stderr)
@@ -253,7 +253,7 @@ def main(args):
             try:
                 if 'externals' not in scanner_kwargs:
                     scanner_kwargs['externals'] = {}
-                externals.update(eval("dict(%s)" % arg))
+                scanner_kwargs['externals'].update(eval("dict(%s)" % arg))
             except SyntaxError:
                 print("external '%s' syntax error" % arg, file=sys.stderr)
                 return -1
@@ -264,20 +264,24 @@ def main(args):
             try:
                 scanner_kwargs['file_read_ahead_limit'] = int(arg)
             except ValueError:
-                print("-t param %s was not an int" % (arg), file=sys.stderr)
+                print("param '%s' was not an int" % (arg), file=sys.stderr)
                 return -1
         elif opt in ['--file-chunk-size']:
             ScannerClass = scan.FileChunkScanner
             try:
                 scanner_kwargs['file_chunk_size'] = int(arg)
             except ValueError:
-                print("-t param %s was not an int" % (arg), file=sys.stderr)
+                print("param '%s' was not an int" % (arg), file=sys.stderr)
                 return -1
         elif opt in ['t', '--thread-pool']:
             try:
                 scanner_kwargs['thread_pool'] = int(arg)
             except ValueError:
-                print("-t param %s was not an int" % (arg), file=sys.stderr)
+                print("param '%s' was not an int" % (arg), file=sys.stderr)
+                return -1
+            if scanner_kwargs['thread_pool'] < 1:
+                print("--thread-pool value can not be lower than 1",
+                        file=sys.stderr)
                 return -1
         elif opt in ['--mode-proc']:
             ScannerClass = scan.PidScanner
@@ -310,13 +314,14 @@ def main(args):
         scanner = ScannerClass(**scanner_kwargs)
     except yara.YaraSyntaxError as err:
         print("Failed to load rules with the following error(s):\n%s" % \
-                err.message)
+                err.message, file=sys.stderr)
         blacklist = set()
         for f, _, _ in err.errors:
             f = os.path.splitext(f[len(rules_rootpath)+1:])[0]
             blacklist.add(f.replace(os.path.sep, '.'))
-        print("\nYou could blacklist guilty using:")
-        print(" --blacklist=%s" % ",".join(blacklist))
+        print("\nYou could blacklist the erroneous rules using:", 
+                file=sys.stderr)
+        print(" --blacklist=%s" % ",".join(blacklist), file=sys.stderr)
         return -1
 
     try:

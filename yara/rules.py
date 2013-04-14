@@ -127,8 +127,8 @@ class RuleContext():
             if string.contents.flags & STRING_FLAGS_FOUND:
                 match = string.contents.matches_head
                 while match:
-                    data = string_at(match.contents.data,
-                                        match.contents.length)
+                    data = frombyte(string_at(match.contents.data,
+                                        match.contents.length))
                     string_list.append(dict(data=data,
                         offset=match.contents.offset,
                         identifier=frombyte(string.contents.identifier),

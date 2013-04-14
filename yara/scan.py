@@ -151,10 +151,22 @@ class Scanner(object):
         
 
 class PathScanner(Scanner):
-    def __init__(self, paths=[], recurse_dirs=False, **scanner_kwargs):
+    def __init__(self, args=[], recurse_dirs=False, 
+                path_end_include=None, path_end_exclude=None, 
+                path_contains_include=None, path_contains_exclude=None, 
+                **scanner_kwargs):
         """Enqueue paths for scanning"""
-        self._paths = paths
+        self._paths = []
+        for path in args:
+            for p in glob(path):
+                if not os.path.exists(p):
+                    raise ValueError("Path %s does not exist" % p)
+                self._paths.append(p)
         self._recurse_dirs = recurse_dirs
+        self._path_end_include = path_end_include
+        self._path_end_exclude = path_end_exclude
+        self._path_contains_include = path_contains_include
+        self._path_contains_exclude = path_contains_exclude
         Scanner.__init__(self, **scanner_kwargs)
 
     def enqueuer(self):
@@ -162,34 +174,78 @@ class PathScanner(Scanner):
             self.enqueue_path(path, path)
         self.enqueue_end()
 
+    def exclude_path(self, path):
+        def do_test(pathtest, tests):
+            return bool(filter(lambda test:pathtest(test), tests))
+
+        if self._path_contains_exclude is not None:
+            contains_exclude = do_test(path.__contains__, 
+                                        self._path_contains_exclude) 
+            if contains_exclude:
+                return True
+
+        if self._path_end_exclude is not None:
+            end_exclude = do_test(path.endswith, self._path_end_exclude)
+            if end_exclude:
+                return True
+
+        exclude_on_not_include = False
+        if self._path_contains_include is not None:
+            contains_include = not do_test(path.__contains__, 
+                                        self._path_contains_include)
+            if contains_include:
+                return False
+            else:
+                exclude_on_not_include = True 
+
+        if self._path_end_include is not None:
+            end_include = not do_test(path.endswith, self._path_end_include)
+            if contains_include:
+                return False
+            else:
+                exclude_on_not_include = True
+
+        return False or exclude_on_not_include
+
     @property
     def paths(self):
         if self._recurse_dirs == True:
             listdir = os.walk
         else:
-            listdir = lambda r: [(r, 
-                    filter(lambda f: os.path.isdir(f), os.listdir(r)), 
-                    filter(lambda f: not os.path.isdir(f), os.listdir(r)))]
-        try:
-            for path in self._paths:
-                for p in glob(path):
-                    if os.path.isdir(p):
-                        for dirpath, dirnames, filenames in listdir(p):
-                            for filename in filenames:
-                                a = os.path.join(dirpath, filename)
-                                yield a
-                    else:
-                        yield p
-        except Exception:
-            print("Fatal error occurred during the paths walk: %s" % \
-                    traceback.format_exc(), file=sys.stderr)
-            self.quit.set()
+            def listdir(d):
+                ls = [(f, os.path.join(d, f)) for f in os.listdir(d)]
+                filenames = [f for f, _ in \
+                                filter(lambda o: not os.path.isdir(o[1]), ls) ]
+                return [(d, [] , filenames)]
 
+        for p in self._paths:
+            if os.path.isdir(p):
+                for dirpath, dirnames, filenames in listdir(p):
+                    for filename in filenames:
+                        a = os.path.join(dirpath, filename)
+                        if self.exclude_path(a):
+                            continue
+                        yield a
+            else:
+                if self.exclude_path(p):
+                    continue
+                yield p
 
+        
 class PidScanner(Scanner):
     """Enqueue pips for scanning"""
-    def __init__(self, pids=[], **scanner_kwargs):
+    def __init__(self, args=[], **scanner_kwargs):
         Scanner.__init__(self, **scanner_kwargs)
+
+        pids = []
+        for pid in args:
+            try:
+                if type(pid) is not int:
+                    pid = int(pid)
+                pids.append(pid)
+            except ValueError:
+                raise ValueError("PID %s was not an int" % (pid))
+
         for pid in pids:
             self.enqueue_pid(tag, pid)
         self.enqueue_end()
@@ -208,21 +264,24 @@ class FileChunkScanner(PathScanner):
 
     def enqueuer(self):
         for path in self.paths:
-            with open(path, 'rb') as f:
-                data = f.read(self._chunk_size)
-                chunk_id = 0
-                while data and not self.quit.is_set():
-                    chunk_start = chunk_id * self._chunk_size
-                    chunk_end = chunk_start + len(data)
-                    tag = "%s[%s:%s]" % (path, chunk_start, chunk_end)
-                    self.enqueue_data(tag, data)
-                    while self.sq_size > self._max_sq_size and \
-                                not self.quit.is_set():
-                        time.sleep(0.1)
+            try:
+                with open(path, 'rb') as f:
                     data = f.read(self._chunk_size)
-                    chunk_id += 1
+                    chunk_id = 0
+                    while data and not self.quit.is_set():
+                        chunk_start = chunk_id * self._chunk_size
+                        chunk_end = chunk_start + len(data)
+                        tag = "%s[%s:%s]" % (path, chunk_start, chunk_end)
+                        self.enqueue_data(tag, data)
+                        while self.sq_size > self._max_sq_size and \
+                                    not self.quit.is_set():
+                            time.sleep(0.1)
+                        data = f.read(self._chunk_size)
+                        chunk_id += 1
+            except Exception as exc:
+                print("Failed to process %s - %s" % (path, exc), 
+                            file=sys.stderr)
         self.enqueue_end()
-
 
 class SyncScanner(Scanner):
     def __init__(self, **scanner_kwargs):

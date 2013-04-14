@@ -24,6 +24,8 @@ This is the base :py:class:`Scanner` class which initialises and aggregates a :p
 :py:class:`Scanner` implements the iter protocol which yields scan results as they complete.  To enable more efficient scanning, Scanner deploys a thread pool for concurrent scanning and manages its execution through its internal job queues. Once a job completes, the job tag id and the results are returned through the dequeue function or yielded during iteration. 
 
 
+:py:class:`PathScanner`  
+---------------------------
 .. py:class:: PathScanner([args, \
                      recurse_dirs,\
                      path_end_include, path_end_exclude,\
@@ -42,6 +44,8 @@ This is the base :py:class:`Scanner` class which initialises and aggregates a :p
             print("%s : %s" % (path, result))
 
 
+:py:class:`FileChunkScanner`  
+--------------------
 .. py:class:: FileChunkScanner([ file_chunk_size, \
                                  file_readahead_limit, \
                                  **path_scanner_kwargs])
@@ -49,6 +53,8 @@ This is the base :py:class:`Scanner` class which initialises and aggregates a :p
 :py:class:`FileChunkScanner` extends :py:class:`PathScanner` and defines a way to reads chunks of data from filepaths choosen by :py:class:`PathScanner` and enqueue :py:class:`Rules`.match_data jobs. 
 
 
+:py:class:`PidScanner`  
+-------------------
 .. py:class:: PidScanner([args, **scanner_kwargs])
 :py:class:`PidScanner` ... 
 

@@ -230,7 +230,6 @@ class PidScanner(Scanner):
     """Enqueue pips for scanning"""
     def __init__(self, args=[], **scanner_kwargs):
         Scanner.__init__(self, **scanner_kwargs)
-
         pids = []
         for pid in args:
             try:
@@ -241,7 +240,7 @@ class PidScanner(Scanner):
                 raise ValueError("PID %s was not an int" % (pid))
 
         for pid in pids:
-            self.enqueue_pid(tag, pid)
+            self.enqueue_pid("%s"%pid, pid)
         self.enqueue_end()
 
 

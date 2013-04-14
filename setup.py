@@ -38,6 +38,9 @@ machine = platform.machine().lower()
 if machine in ['i686', 'x86']:
     machine = 'x86_32'
 
+if machine in ['amd64']:
+    machine = 'x86_64'
+
 if system == 'windows':
     ext = '.dll'
 else:

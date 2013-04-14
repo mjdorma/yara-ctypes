@@ -179,28 +179,22 @@ class PathScanner(Scanner):
             return bool(filter(lambda test:pathtest(test), tests))
 
         if self._path_contains_exclude is not None:
-            contains_exclude = do_test(path.__contains__, 
-                                        self._path_contains_exclude) 
-            if contains_exclude:
+            if do_test(path.__contains__, self._path_contains_exclude):
                 return True
 
         if self._path_end_exclude is not None:
-            end_exclude = do_test(path.endswith, self._path_end_exclude)
-            if end_exclude:
+            if do_test(path.endswith, self._path_end_exclude):
                 return True
 
         exclude_on_not_include = False
         if self._path_contains_include is not None:
-            contains_include = not do_test(path.__contains__, 
-                                        self._path_contains_include)
-            if contains_include:
+            if not do_test(path.__contains__, self._path_contains_include):
                 return False
             else:
                 exclude_on_not_include = True 
 
         if self._path_end_include is not None:
-            end_include = not do_test(path.endswith, self._path_end_include)
-            if contains_include:
+            if not do_test(path.endswith, self._path_end_include):
                 return False
             else:
                 exclude_on_not_include = True
@@ -282,6 +276,7 @@ class FileChunkScanner(PathScanner):
                 print("Failed to process %s - %s" % (path, exc), 
                             file=sys.stderr)
         self.enqueue_end()
+
 
 class SyncScanner(Scanner):
     def __init__(self, **scanner_kwargs):

@@ -201,7 +201,7 @@ class FileChunkScanner(PathScanner):
     def __init__(self, file_chunk_size=DEFAULT_FILE_CHUNK_SIZE,
                        file_readahead_limit=DEFAULT_FILE_READAHEAD_LIMIT,
                        **path_scanner_kwargs):
-        self._chunk_size = chunk_size
+        self._chunk_size = file_chunk_size
         self._max_sq_size = (file_readahead_limit / file_chunk_size) + 1
         PathScanner.__init__(self, **path_scanner_kwargs)
 

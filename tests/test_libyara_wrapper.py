@@ -2,27 +2,19 @@ import unittest
 import os
 import time
 import doctest
-import traceback
 
-try:
-    import yara
-    from yara.libyara_wrapper import *
-    import_error = None
-except Exception:
-    import_error = traceback.format_exc()
+import yara
+from yara.libyara_wrapper import *
 
 TEST_ROOT = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'rules')
 
 class TestLibYara(unittest.TestCase):
-    def setUp(self):
-        if import_error:
-            self.fail(import_error)
 
     def error_report_function(self, filename, line_number, error_message):
         #if not filename:
         #    filename = "_"
-        print("test hooked error %s:%s: %s"%(filename, 
-                            line_number, error_message))
+        #print("test hooked error %s:%s: %s"%(filename, 
+        #                    line_number, error_message))
         self.err_callback_count += 1
 
     def test_readme_doctest(self):

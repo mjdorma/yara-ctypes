@@ -157,4 +157,38 @@ class TestScanNamespace(unittest.TestCase):
         self.assertEqual(ret, -1)
         self.assertEqual("external '44 broken' syntax error", stderr.strip())
 
+    def test_recurse_paths(self):
+        ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', RULES_ROOT)
+        self.assertEqual(ret, 0)
+        self.assertEqual(len(stdout.splitlines()), 1)
+        self.assertTrue("rules/meta.yar: main.Bird01" in stdout)
 
+        ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', 
+                    '--recurse-dirs', RULES_ROOT)
+        self.assertEqual(ret, 0)
+        self.assertEqual(len(stdout.splitlines()), 2)
+        self.assertTrue("rules/meta.yar: main.Bird01" in stdout)
+        self.assertTrue("rules/bird/meta.yar: main.Bird01" in stdout)
+        self.assertEqual(ret, 0)
+
+    def test_mode_unknown(self):
+        ret, stdout, stderr = run_main('--mode=undef')
+        self.assertEqual("unknown mode undef", stderr.strip())
+        self.assertEqual(ret, -1)
+
+    def test_mode_file(self):
+        ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', 
+                '--mode=file', RULES_ROOT)
+        self.assertEqual(ret, 0)
+        self.assertEqual(len(stdout.splitlines()), 1)
+        self.assertTrue("rules/meta.yar: main.Bird01" in stdout)
+
+    def test_mode_chunk(self):
+        ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', 
+                '--mode=chunk', RULES_ROOT)
+        self.assertEqual(ret, 0)
+        self.assertEqual(len(stdout.splitlines()), 1)
+        self.assertTrue("rules/meta.yar[0:204]: main.Bird01" in stdout)
+
+    def test_path_filters(self):
+        pass

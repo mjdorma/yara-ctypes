@@ -10,8 +10,6 @@ else:
     from queue import Queue, Empty
 import time
 import atexit
-import json
-import httplib
 
 import yara
 
@@ -273,6 +271,8 @@ class SyncScanner(Scanner):
 
 MAX_POST_SIZE = 2**20 * 100 # 100 MB
 #   import bottle
+#   import json
+#   import httplib
 #   class ScannerWebAPI(object):
 #       def __init__(self, max_post_size=MAX_POST_SIZE, scanner):
 #           self._max_post_size = max_post_size 

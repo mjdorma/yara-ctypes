@@ -31,7 +31,8 @@ class Scanner(object):
                        thread_pool=DEFAULT_THREAD_POOL,
                        fast_match=False,
                        externals={}, **kwargs):
-        """Scanner yields scan results in a tuple of (path|pid, result)
+        """Scanner - base Scanner class
+
         kwargs:
             rules_rootpath - path to the root of the rules directory
             whitelist - whitelist of rules to use in scanner
@@ -43,7 +44,7 @@ class Scanner(object):
 
         Note: 
             define an enqueuer function if the enqueue operation will take
-            a long time
+            a long time.  This function is executed asynchronously 
         """
         if rule_filepath is None:
             self._rules = yara.load_rules(rules_rootpath=rules_rootpath,
@@ -97,8 +98,8 @@ class Scanner(object):
     def enqueue_data(self, tag, data, **match_kwargs):
         self._jq.put((self.rules.match_data, tag, (data,), match_kwargs))
 
-    def enqueue_pid(self, tag, pid, **match_kwargs):
-        self._jq.put((self.rules.match_pid, tag, (pid,), match_kwargs))
+    def enqueue_proc(self, tag, pid, **match_kwargs):
+        self._jq.put((self.rules.match_proc, tag, (pid,), match_kwargs))
 
     def enqueue_end(self):
         """queue the exit condition.  Threads will complete once 
@@ -240,7 +241,7 @@ class PidScanner(Scanner):
                 raise ValueError("PID %s was not an int" % (pid))
 
         for pid in pids:
-            self.enqueue_pid("%s"%pid, pid)
+            self.enqueue_proc("%s"%pid, pid)
         self.enqueue_end()
 
 
@@ -320,8 +321,8 @@ class SyncScanner(Scanner):
     def match_paths(self, path_list, **match_kwargs):
         return self._sync_scan(self.enqueue_path, path_list, match_kwargs)
 
-    def match_pids(self, pid_list, **match_kwargs):
-        return self._sync_scan(self.enqueue_pid, pid_list, match_kwargs)
+    def match_procs(self, pid_list, **match_kwargs):
+        return self._sync_scan(self.enqueue_proc, pid_list, match_kwargs)
 
     def match_data(self, data_list, **match_kwargs):
         return self._sync_scan(self.enqueue_data, data_list, match_kwargs)

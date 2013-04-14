@@ -291,7 +291,10 @@ class SyncScanner(Scanner):
         try:
             while not self.quit.is_set():
                 self._new_results.clear()
-                scan_id, res = self.dequeue()
+                ret = self.dequeue()
+                if ret is None:
+                    break
+                scan_id, res = ret
                 self.results[scan_id] = res
                 self._new_results.set()
         finally:

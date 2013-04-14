@@ -1,18 +1,22 @@
 .. _howto-scan:
 
-How to scan with :mod:`yara.scan` 
+How to scan using yara-ctypes :mod:`yara.scan` 
 =====================================
 
 This page should contain all of the information required to successfully
 operate :mod:`yara.scan` as a system scanning utility.
 
 
-Executing :mod:`yara.scan`
+Executing :mod:`yara.cli`
 --------------------------
 
 Once yara-ctypes is installed into your Python environment you can run the scan module by executing the scan module as follows::
 
-    $ python -m yara.scan -h
+    $ python -m yara.cli -h
+
+or::
+
+    $ yara-ctypes -h
 
 
 Performing a scan
@@ -20,10 +24,9 @@ Performing a scan
 
 *List available modules*::
 
-    $ python -m yara.scan --list
+    $ yara-ctypes --list
 
-    Rules + hbgary.compiler
-          + example.packer_rules
+    Rules + example.packer_rules
           + hbgary.sockets
           + hbgary.libs
           + hbgary.compression
@@ -40,7 +43,7 @@ Performing a scan
      6975 pts/7    00:00:05 bash
     13479 pts/7    00:00:00 ps
 
-    $ sudo python -m yara.scan --proc 6975 > result.out
+    $ sudo yara-ctypes --proc 6975 > result.out
     
     Rules + hbgary.compiler
           + example.packer_rules
@@ -61,7 +64,7 @@ Performing a scan
 
 *Scan a file*::
 
-    $ sudo python -m yara.scan /usr/bin/ > result.out
+    $ sudo yara-ctypes /usr/bin/ > result.out
 
     Rules + hbgary.compiler
           + example.packer_rules
@@ -165,7 +168,7 @@ folder with the input argument ``--root=~/rules/``.
 
 Confirm the rules are being loaded by :mod:`yara.scan`::
 
-    $ python -m yara.scan --list
+    $ yara-ctypes --list
     Rules + file.loggers
           + file.infectors
           + file.spammers
@@ -183,7 +186,7 @@ Let's say we want to scan a bunch of files against all of the yar files under
 
 i.e.::
 
-    $ python -m yara.scan --blacklist=pid --list
+    $ yara-ctypes --blacklist=pid --list
     Rules + file.infectors
           + file.loggers
           + file.spammers
@@ -194,7 +197,7 @@ Whitelist and blacklist parameters are globbed out (*i.e. pid**).
 
 The results are in and we find that ``file.spammers`` namespace is producing far too much noise.  Let's remove ``file.spammers`` from scan too::
 
-    $ python -m yara.scan --blacklist=pid,file.spamm --list 
+    $ yara-ctypes --blacklist=pid,file.spamm --list 
     Rules + file.infectors
           + file.loggers
 
@@ -202,7 +205,7 @@ The results are in and we find that ``file.spammers`` namespace is producing far
 To demonstrate the namespace convetion further, we may find ourselves wanting
 to run a scan which includes ```pid.spammers```.  To do this we can simply run::
 
-    $ python -m yara.scan --blacklist=file.spamm --whitelist=pid.spam,file --list
+    $ yara-ctypes --blacklist=file.spamm --whitelist=pid.spam,file --list
     Rules + file.infectors
           + file.loggers
           + pid.spammers

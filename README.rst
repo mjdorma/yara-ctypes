@@ -39,12 +39,12 @@ Simply run the following::
 
     > python setup.py install
     > python setup.py test
-    > python -m yara.scan -h
+    > yara-ctypes -h
 
 or `PyPi`_:: 
 
     > pip install yara
-    > python -m yara.scan -h
+    > yara-ctypes -h
 
 
 .. note::

@@ -2,13 +2,21 @@ import unittest
 import os
 import time
 import doctest
+import traceback
 
-import yara
-from yara.libyara_wrapper import *
+try:
+    import yara
+    from yara.libyara_wrapper import *
+    import_error = None
+except Exception:
+    import_error = traceback.format_exc()
 
 TEST_ROOT = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'rules')
 
 class TestLibYara(unittest.TestCase):
+    def setUp(self):
+        if import_error:
+            self.fail(import_error)
 
     def error_report_function(self, filename, line_number, error_message):
         #if not filename:

@@ -21,22 +21,29 @@ Scanner command line interface.
 
 
 __help__ = """
-NAME scan - scan files or processes against yara signatures
+NAME scan - Scan files or processes against yara signatures
 
 SYNOPSIS
-    python scan.py [OPTIONS]... [FILE(s)|PID(s)|IP:PORT]...
+    yara-ctypes [OPTIONS]... [FILE(s)|PID(s)]...
 
 DESCRIPTION
 
 Scanner control:
-    --mode=file
-        mode options [file|chunk|proc]
+    --mode=default mode is stdin or file
+        mode options [file|chunk|proc|stdin]
         file  -queues file paths found in FILE(s)
         chunk -queues chunks of data read from files found in FILE(s)
         proc  -enqueues PID(s) for process scanning
+        stdin -read from the stdin stream. 
 
     --thread-pool=%s
         size of the thread pool used in the Scanner instance 
+
+    --chunk-size=%s
+        size of data in bytes to read and enqueue from data read from a stream
+
+    --readhead-limit=%s
+        maximum number of bytes to read ahead when reading data from a stream
 
 File control:
     --recurse-dirs 
@@ -53,14 +60,6 @@ File control:
 
     --path-contains-include=[str1,str2,str3, ...]
         include path's that contain str (comma separate list)
-
-    --chunk-size=%s
-        size of data in bytes to chop up a file scan
-        note: setting this value implicitly forces --mode=chunk
-
-    --readhead-limit=%s
-        maximum number of bytes to read ahead when reading file-chunks
-        note: setting this value implicitly forces --mode=chunk
 
 Rules control:
   rule:  
@@ -109,8 +108,8 @@ Scan output control:
     -e 
         don't output scan errors
 """ % (scan.DEFAULT_THREAD_POOL,
-        scan.DEFAULT_FILE_CHUNK_SIZE,
-        scan.DEFAULT_FILE_READAHEAD_LIMIT,
+        scan.DEFAULT_STREAM_CHUNK_SIZE,
+        scan.DEFAULT_STREAM_READAHEAD_LIMIT,
         scan.MAX_POST_SIZE)
 
 
@@ -206,8 +205,13 @@ def main(args):
         print("Getopt error: %s" % (exc), file=sys.stderr)
         return -1
 
-    ScannerClass = scan.PathScanner
-    scanner_kwargs = dict(args=args)
+    scanner_kwargs = {}
+    scanner_kwargs['args'] = args
+
+    if not args and sys.stdin.isatty():
+        ScannerClass = scan.StdinScanner
+    else:
+        ScannerClass = scan.PathScanner
 
     list_rules = False
     run_scan_kwargs = {}
@@ -283,16 +287,18 @@ def main(args):
         elif opt in ['--recurse-dirs']:
             scanner_kwargs['recurse_dirs'] = True
         elif opt in ['--readahead-limit']:
-            ScannerClass = scan.FileChunkScanner
+            if ScannerClass != scan.StdinScanner:
+                ScannerClass = scan.FileChunkScanner
             try:
-                scanner_kwargs['file_read_ahead_limit'] = int(arg)
+                scanner_kwargs['stream_read_ahead_limit'] = int(arg)
             except ValueError:
                 print("param '%s' was not an int" % (arg), file=sys.stderr)
                 return -1
         elif opt in ['--chunk-size']:
-            ScannerClass = scan.FileChunkScanner
+            if ScannerClass != scan.StdinScanner:
+                ScannerClass = scan.FileChunkScanner
             try:
-                scanner_kwargs['file_chunk_size'] = int(arg)
+                scanner_kwargs['stream_chunk_size'] = int(arg)
             except ValueError:
                 print("param '%s' was not an int" % (arg), file=sys.stderr)
                 return -1
@@ -313,6 +319,10 @@ def main(args):
                 ScannerClass = scan.FileChunkScanner
             elif arg == 'proc':
                 ScannerClass = scan.PidScanner
+            elif arg == 'stdin':
+                if not sys.stdin.isatty():
+                    print("No stdin available for stdin mode to function")
+                ScannerClass = scan.StdinScanner
             else:
                 print("unknown mode %s" % arg, file=sys.stderr)
                 return -1

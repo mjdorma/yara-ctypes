@@ -31,7 +31,7 @@ def run_main(*args):
         raise 
     return (ret, stdout, stderr)
 
-class TestScanNamespace(unittest.TestCase):
+class TestCLI(unittest.TestCase):
 
     def test_help(self):
         ret, stdout, stderr = run_main('--help')
@@ -50,7 +50,7 @@ class TestScanNamespace(unittest.TestCase):
         self.assertTrue("example.packer_rules" in stdout)
 
     def test_select_yarafile(self):
-        ret, stdout, stderr = run_main('-r', BIRD_YAR)
+        ret, stdout, stderr = run_main('-r', BIRD_YAR, '.')
         self.assertTrue("does not exist" not in stderr, msg="got %s" % stderr)
         self.assertEqual(ret, 0)
 
@@ -104,12 +104,12 @@ class TestScanNamespace(unittest.TestCase):
 
     def test_file_chunks(self):
         ret, stdout, stderr = run_main('-r', BIRD_YAR, 
-                            '--chunk-size=10', BIRD_YAR)
+                            '--chunk-size=10', '--mode=chunk', BIRD_YAR)
         self.assertTrue("rules/bird/meta.yar[150:160]" in stdout)
         self.assertEqual(ret, 0)
 
         ret, stdout, stderr = run_main('-r', BIRD_YAR, 
-                            '--chunk-size=10', 
+                            '--chunk-size=10', '--mode=chunk',
                             '--readahead-limit=20', BIRD_YAR)
         self.assertTrue("rules/bird/meta.yar[150:160]" in stdout)
         self.assertEqual(ret, 0)
@@ -182,6 +182,21 @@ class TestScanNamespace(unittest.TestCase):
         self.assertEqual(ret, 0)
         self.assertEqual(len(stdout.splitlines()), 1)
         self.assertTrue("rules/meta.yar: main.Bird01" in stdout)
+
+    def test_mode_stdin(self):
+        with open(BIRD_YAR, 'rb') as f:
+            data = f.read()
+        stream = StringIO(data)
+        stream.isatty = lambda :True
+        try:
+            sys.stdin = stream              
+            ret, stdout, stderr = run_main('-r', BIRD_YAR, 
+                    '--chunk-size=10', '--readahead-limit=20', 
+                    '--simple')
+            self.assertTrue("stream[150:160]: main.Bird01" in stdout)
+            self.assertEqual(ret, 0)
+        finally:
+            sys.stdin = sys.__stdin__
 
     def test_scan_filepath_does_not_exist(self):
         ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', 

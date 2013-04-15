@@ -114,18 +114,26 @@ class Scanner(object):
 
     def enqueue_stream(self, stream, basetag='stream'):
         data = stream.read(self._chunk_size + self._chunk_overlap)
-        chunk_id = 0
         read_bytes = self._chunk_size - self._chunk_overlap
+        chunk_id = 0
+        chunk_start = 0
         while data and not self.quit.is_set():
-            chunk_start = chunk_id * (read_bytes)
             chunk_end = chunk_start + len(data)
             tag = "%s[%s:%s]" % (basetag, chunk_start, chunk_end)
             self.enqueue_data(tag, data)
             while self.sq_size > self._max_sq_size and \
                         not self.quit.is_set():
                 time.sleep(0.1)
-            data = data[self._chunk_size:] + stream.read(read_bytes)
+            if self._chunk_overlap > 0:
+                overlap = data[-1 * self._chunk_overlap:]
+                data = stream.read(self._chunk_size)
+                if not data:
+                    break
+                data = overlap + data
+            else:
+                data = stream.read(self._chunk_size)
             chunk_id += 1
+            chunk_start = (chunk_id * self._chunk_size) - self._chunk_overlap
 
     def enqueue_end(self):
         """queue the exit condition.  Threads will complete once 

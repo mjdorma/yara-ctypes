@@ -98,7 +98,7 @@ Change log
 
 version 1.7.0 (15/04/2013)
 
-* ships with builds of yara-1.7 
+* ships with builds of libyara-1.7 
 * compatibility issues solves with yara-1.7's interface changes
 * major change up and improvement to the scan command line interface. 
 * a lot more testing

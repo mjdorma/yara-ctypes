@@ -66,9 +66,10 @@ class Scanner(object):
                                       externals=externals,
                                       fast_match=fast_match)
         self._chunk_size = stream_chunk_size
-        self._chunk_overlap = (stream_chunk_size * stream_chunk_overlap) / 100
-        self._max_sq_size = (stream_readahead_limit / \
-                             (stream_chunk_size + self._chunk_overlap)) + 1
+        self._chunk_overlap = int((stream_chunk_size * \
+                                  stream_chunk_overlap) / 100)
+        self._max_sq_size = int((stream_readahead_limit / \
+                             (stream_chunk_size + self._chunk_overlap)) + 1)
         self._jq = Queue()
         self._rq = Queue()
         self._empty = Event()

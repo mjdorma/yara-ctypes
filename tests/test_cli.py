@@ -91,7 +91,7 @@ class TestCLI(unittest.TestCase):
     def test_simple(self):
         ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', BIRD_YAR)
         self.assertEqual(ret, 0)
-        self.assertTrue("rules/bird/meta.yar: main.Bird01" in stdout)
+        self.assertTrue("meta.yar: main.Bird01" in stdout)
 
     def test_root(self):
         ret, stdout, stderr = run_main('--root=doesnotexit')
@@ -105,13 +105,13 @@ class TestCLI(unittest.TestCase):
     def test_file_chunks(self):
         ret, stdout, stderr = run_main('-r', BIRD_YAR, 
                             '--chunk-size=10', '--mode=chunk', BIRD_YAR)
-        self.assertTrue("rules/bird/meta.yar[150:160]" in stdout)
+        self.assertTrue("meta.yar[150:160]" in stdout)
         self.assertEqual(ret, 0)
 
         ret, stdout, stderr = run_main('-r', BIRD_YAR, 
                             '--chunk-size=10', '--mode=chunk',
                             '--readahead-limit=20', BIRD_YAR)
-        self.assertTrue("rules/bird/meta.yar[150:160]" in stdout)
+        self.assertTrue("meta.yar[150:160]" in stdout)
         self.assertEqual(ret, 0)
 
         ret, stdout, stderr = run_main('--chunk-size=a')
@@ -161,14 +161,14 @@ class TestCLI(unittest.TestCase):
         ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', RULES_ROOT)
         self.assertEqual(ret, 0)
         self.assertEqual(len(stdout.splitlines()), 1)
-        self.assertTrue("rules/meta.yar: main.Bird01" in stdout)
+        self.assertTrue("meta.yar: main.Bird01" in stdout)
 
         ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', 
                     '--recurse-dirs', RULES_ROOT)
         self.assertEqual(ret, 0)
         self.assertEqual(len(stdout.splitlines()), 2)
-        self.assertTrue("rules/meta.yar: main.Bird01" in stdout)
-        self.assertTrue("rules/bird/meta.yar: main.Bird01" in stdout)
+        self.assertTrue("meta.yar: main.Bird01" in stdout)
+        self.assertTrue("meta.yar: main.Bird01" in stdout)
         self.assertEqual(ret, 0)
 
     def test_mode_unknown(self):
@@ -181,7 +181,7 @@ class TestCLI(unittest.TestCase):
                 '--mode=file', RULES_ROOT)
         self.assertEqual(ret, 0)
         self.assertEqual(len(stdout.splitlines()), 1)
-        self.assertTrue("rules/meta.yar: main.Bird01" in stdout)
+        self.assertTrue("meta.yar: main.Bird01" in stdout)
 
     def test_mode_stdin(self):
         with open(BIRD_YAR) as f:
@@ -206,8 +206,8 @@ class TestCLI(unittest.TestCase):
 
     def test_globbed_path(self):
         ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', 
-                "tests/*.py")
-        self.assertTrue("tests/test_cli.py: main.Bird01" in stdout)
+                "tests%s*.py" % os.path.sep)
+        self.assertTrue("test_cli.py: main.Bird01" in stdout)
         self.assertEqual(ret, 0)
 
     def test_mode_chunk(self):
@@ -215,7 +215,7 @@ class TestCLI(unittest.TestCase):
                 '--mode=chunk', RULES_ROOT)
         self.assertEqual(ret, 0)
         self.assertEqual(len(stdout.splitlines()), 1)
-        self.assertTrue("rules/meta.yar[0:204]: main.Bird01" in stdout)
+        self.assertTrue("meta.yar[0:204]: main.Bird01" in stdout)
 
     def test_path_filters(self):
         pass

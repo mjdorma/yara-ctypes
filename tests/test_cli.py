@@ -102,15 +102,11 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(ret, -1)
         self.assertTrue("You could blacklist the erroneous " in stderr)
 
-    def test_file_chunks(self):
-        ret, stdout, stderr = run_main('-r', BIRD_YAR, 
-                            '--chunk-size=10', '--mode=chunk', BIRD_YAR)
-        self.assertTrue("meta.yar[150:160]" in stdout)
-        self.assertEqual(ret, 0)
-
+    def test_chunk_size(self):
         ret, stdout, stderr = run_main('-r', BIRD_YAR, 
                             '--chunk-size=10', '--mode=chunk',
-                            '--readahead-limit=20', BIRD_YAR)
+                            '--chunk-overlap=0',
+                            BIRD_YAR)
         self.assertTrue("meta.yar[150:160]" in stdout)
         self.assertEqual(ret, 0)
 
@@ -118,9 +114,49 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(ret, -1)
         self.assertEqual("param 'a' was not an int", stderr.strip())
 
+    def test_readahead_limit(self):
+        ret, stdout, stderr = run_main('-r', BIRD_YAR, 
+                            '--chunk-size=10', '--mode=chunk',
+                            '--chunk-overlap=0',
+                            '--readahead-limit=20', BIRD_YAR)
+        self.assertTrue("meta.yar[150:160]" in stdout)
+        self.assertEqual(ret, 0)
+
         ret, stdout, stderr = run_main('--readahead-limit=a')
         self.assertEqual(ret, -1)
         self.assertEqual("param 'a' was not an int", stderr.strip())
+
+    def test_chunk_overlap(self):
+        ret, stdout, stderr = run_main('-r', BIRD_YAR, 
+                            '--chunk-size=10', '--mode=chunk',
+                            '--readahead-limit=20', 
+                            '--chunk-overlap=0', '--simple',
+                            BIRD_YAR)
+        self.assertTrue("meta.yar[150:160]" in stdout)
+        self.assertEqual(ret, 0)
+
+        ret, stdout, stderr = run_main('-r', BIRD_YAR, 
+                            '--chunk-size=10', '--mode=chunk',
+                            '--readahead-limit=20', 
+                            '--chunk-overlap=10', '--simple',
+                            BIRD_YAR)
+        self.assertTrue("meta.yar[153:162]: main.Bird01" in stdout)
+        self.assertTrue("meta.yar[54:63]: main.Bird01" in stdout)
+        self.assertEqual(ret, 0)
+        
+        ret, stdout, stderr = run_main('--chunk-overlap=a')
+        self.assertEqual(ret, -1)
+        self.assertEqual("param 'a' was not an int", stderr.strip())
+
+        ret, stdout, stderr = run_main('--chunk-overlap=100')
+        self.assertEqual(ret, -1)
+        self.assertEqual("chunk-overlap value must be between 0 - 99",
+                stderr.strip())
+
+        ret, stdout, stderr = run_main('--chunk-overlap=-1')
+        self.assertEqual(ret, -1)
+        self.assertEqual("chunk-overlap value must be between 0 - 99",
+                stderr.strip())
 
     def test_threadpool(self):
         ret, stdout, stderr = run_main('--thread-pool=a')
@@ -192,6 +228,7 @@ class TestCLI(unittest.TestCase):
             sys.stdin = stream              
             ret, stdout, stderr = run_main('-r', BIRD_YAR, 
                     '--chunk-size=10', '--readahead-limit=20', 
+                    '--chunk-overlap=0',
                     '--simple')
             self.assertTrue("stream[150:160]: main.Bird01" in stdout)
             self.assertEqual(ret, 0)

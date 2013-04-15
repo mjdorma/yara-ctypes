@@ -22,7 +22,7 @@ YARA rules Scanner class definitions
 DEFAULT_THREAD_POOL = 4
 DEFAULT_STREAM_CHUNK_SIZE = 2**20
 DEFAULT_STREAM_READAHEAD_LIMIT = 2**32
-
+DEFAULT_STREAM_CHUNK_OVERLAP = 10
 class Scanner(object):
     enqueuer = None 
 
@@ -33,6 +33,7 @@ class Scanner(object):
                        thread_pool=DEFAULT_THREAD_POOL,
                        fast_match=False,
                        stream_chunk_size=DEFAULT_STREAM_CHUNK_SIZE,
+                       stream_chunk_overlap=DEFAULT_STREAM_CHUNK_OVERLAP,
                        stream_readahead_limit=DEFAULT_STREAM_READAHEAD_LIMIT,
                        externals={}, **kwargs):
         """Scanner - base Scanner class
@@ -65,7 +66,9 @@ class Scanner(object):
                                       externals=externals,
                                       fast_match=fast_match)
         self._chunk_size = stream_chunk_size
-        self._max_sq_size = (stream_readahead_limit / stream_chunk_size) + 1
+        self._chunk_overlap = (stream_chunk_size * stream_chunk_overlap) / 100
+        self._max_sq_size = (stream_readahead_limit / \
+                             (stream_chunk_size + self._chunk_overlap)) + 1
         self._jq = Queue()
         self._rq = Queue()
         self._empty = Event()
@@ -110,17 +113,18 @@ class Scanner(object):
         self._jq.put((self.rules.match_proc, tag, (pid,), match_kwargs))
 
     def enqueue_stream(self, stream, basetag='stream'):
-        data = stream.read(self._chunk_size)
+        data = stream.read(self._chunk_size + self._chunk_overlap)
         chunk_id = 0
+        read_bytes = self._chunk_size - self._chunk_overlap
         while data and not self.quit.is_set():
-            chunk_start = chunk_id * self._chunk_size
+            chunk_start = chunk_id * (read_bytes)
             chunk_end = chunk_start + len(data)
             tag = "%s[%s:%s]" % (basetag, chunk_start, chunk_end)
             self.enqueue_data(tag, data)
             while self.sq_size > self._max_sq_size and \
                         not self.quit.is_set():
                 time.sleep(0.1)
-            data = stream.read(self._chunk_size)
+            data = data[self._chunk_size:] + stream.read(read_bytes)
             chunk_id += 1
 
     def enqueue_end(self):

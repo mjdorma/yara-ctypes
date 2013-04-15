@@ -20,6 +20,8 @@ YARA rules Scanner class definitions
 """
 
 DEFAULT_THREAD_POOL = 4
+DEFAULT_STREAM_CHUNK_SIZE = 2**20
+DEFAULT_STREAM_READAHEAD_LIMIT = 2**32
 
 class Scanner(object):
     enqueuer = None 
@@ -30,6 +32,8 @@ class Scanner(object):
                        rule_filepath=None,
                        thread_pool=DEFAULT_THREAD_POOL,
                        fast_match=False,
+                       stream_chunk_size=DEFAULT_STREAM_CHUNK_SIZE,
+                       stream_readahead_limit=DEFAULT_STREAM_READAHEAD_LIMIT,
                        externals={}, **kwargs):
         """Scanner - base Scanner class
 
@@ -40,6 +44,8 @@ class Scanner(object):
             rule_filepath=None,
             thread_pool - number of threads to use in scanner
             fast_match - scan fast True / False 
+            stream_chunk_size - size in bytes to read from a stream 
+            steram_readahead_limit - size in bytes limit for stream read ahead
             externals - externally defined variables             
 
         Note: 
@@ -58,6 +64,8 @@ class Scanner(object):
                                       includes=True,
                                       externals=externals,
                                       fast_match=fast_match)
+        self._chunk_size = stream_chunk_size
+        self._max_sq_size = (stream_readahead_limit / stream_chunk_size) + 1
         self._jq = Queue()
         self._rq = Queue()
         self._empty = Event()
@@ -100,6 +108,20 @@ class Scanner(object):
 
     def enqueue_proc(self, tag, pid, **match_kwargs):
         self._jq.put((self.rules.match_proc, tag, (pid,), match_kwargs))
+
+    def enqueue_stream(self, stream, basetag='stream'):
+        data = stream.read(self._chunk_size)
+        chunk_id = 0
+        while data and not self.quit.is_set():
+            chunk_start = chunk_id * self._chunk_size
+            chunk_end = chunk_start + len(data)
+            tag = "%s[%s:%s]" % (basetag, chunk_start, chunk_end)
+            self.enqueue_data(tag, data)
+            while self.sq_size > self._max_sq_size and \
+                        not self.quit.is_set():
+                time.sleep(0.1)
+            data = stream.read(self._chunk_size)
+            chunk_id += 1
 
     def enqueue_end(self):
         """queue the exit condition.  Threads will complete once 
@@ -228,7 +250,7 @@ class PathScanner(Scanner):
 
         
 class PidScanner(Scanner):
-    """Enqueue pips for scanning"""
+    """Enqueue pids for scanning"""
     def __init__(self, args=[], **scanner_kwargs):
         Scanner.__init__(self, **scanner_kwargs)
         pids = []
@@ -245,40 +267,32 @@ class PidScanner(Scanner):
         self.enqueue_end()
 
 
-DEFAULT_FILE_CHUNK_SIZE = 2**20
-DEFAULT_FILE_READAHEAD_LIMIT = 2**32
 class FileChunkScanner(PathScanner):
     """Enqueue chunks of data from paths"""
-    def __init__(self, file_chunk_size=DEFAULT_FILE_CHUNK_SIZE,
-                       file_readahead_limit=DEFAULT_FILE_READAHEAD_LIMIT,
-                       **path_scanner_kwargs):
-        self._chunk_size = file_chunk_size
-        self._max_sq_size = (file_readahead_limit / file_chunk_size) + 1
-        PathScanner.__init__(self, **path_scanner_kwargs)
-
     def enqueuer(self):
         for path in self.paths:
             try:
                 with open(path, 'rb') as f:
-                    data = f.read(self._chunk_size)
-                    chunk_id = 0
-                    while data and not self.quit.is_set():
-                        chunk_start = chunk_id * self._chunk_size
-                        chunk_end = chunk_start + len(data)
-                        tag = "%s[%s:%s]" % (path, chunk_start, chunk_end)
-                        self.enqueue_data(tag, data)
-                        while self.sq_size > self._max_sq_size and \
-                                    not self.quit.is_set():
-                            time.sleep(0.1)
-                        data = f.read(self._chunk_size)
-                        chunk_id += 1
+                    self.enqueue_stream(f, basetag=path)
             except Exception as exc:
-                print("Failed to process %s - %s" % (path, exc), 
+                print("Failed to enqueue %s - %s" % (path,
+                                traceback.format_exc()), 
                             file=sys.stderr)
         self.enqueue_end()
 
 
+class StdinScanner(Scanner):
+    """Enqueue chunks of data from 'stream'"""
+    def enqueuer(self):
+        try:
+            self.enqueue_stream(sys.stdin)
+        except Exception as exc:
+            print("Error reading stream - %s" % (exc), file=sys.stderr)
+        self.enqueue_end()
+
+
 class SyncScanner(Scanner):
+    """Synchronised matching - take advantage of Scanner synchronously""" 
     def __init__(self, **scanner_kwargs):
         self._scan_id_lock = Lock()
         self._scan_id = 0

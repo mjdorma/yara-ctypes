@@ -96,6 +96,11 @@ with GitHub's issues system.
 Change log
 ==========
 
+version 1.7.1 (17/04/2013)
+
+* StdinScanner 
+* overlap control for stream chunk enqueueing 
+
 version 1.7.0 (15/04/2013)
 
 * ships with builds of libyara-1.7 

@@ -184,7 +184,7 @@ class TestCLI(unittest.TestCase):
         self.assertTrue("rules/meta.yar: main.Bird01" in stdout)
 
     def test_mode_stdin(self):
-        with open(BIRD_YAR, 'rb') as f:
+        with open(BIRD_YAR) as f:
             data = f.read()
         stream = StringIO(data)
         stream.isatty = lambda :True

@@ -136,12 +136,12 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(ret, 0)
 
         ret, stdout, stderr = run_main('-r', BIRD_YAR, 
-                            '--chunk-size=10', '--mode=chunk',
+                            '--chunk-size=16', '--mode=chunk',
                             '--readahead-limit=20', 
-                            '--chunk-overlap=10', '--simple',
+                            '--chunk-overlap=50', '--simple',
                             BIRD_YAR)
-        self.assertTrue("meta.yar[153:162]: main.Bird01" in stdout)
-        self.assertTrue("meta.yar[54:63]: main.Bird01" in stdout)
+        self.assertTrue("meta.yar[136:160]: main.Bird01" in stdout)
+        self.assertTrue("meta.yar[40:64]: main.Bird01" in stdout)
         self.assertEqual(ret, 0)
         
         ret, stdout, stderr = run_main('--chunk-overlap=a')

@@ -3,7 +3,7 @@ Introduction to yara-ctypes-python
 
 What is yara-ctypes:
 
-* A powerful python wrapper for `yara-project's libyara v1.6`_.
+* A powerful python wrapper for `yara-project's libyara v1.7`_.
 * Supports thread safe matching of YARA rules.
 * namespace management to allow easy loading of multiple YARA rules into a
   single libyara context. 

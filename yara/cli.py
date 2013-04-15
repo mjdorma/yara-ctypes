@@ -42,8 +42,12 @@ Scanner control:
     --chunk-size=%s
         size of data in bytes to read and enqueue from data read from a stream
 
+    --chunk-overlap=%s
+        percentage from 0 - 99 %% of data to be reprocesses on block boundaries
+
     --readhead-limit=%s
         maximum number of bytes to read ahead when reading data from a stream
+
 
 File control:
     --recurse-dirs 
@@ -108,9 +112,10 @@ Scan output control:
     -e 
         don't output scan errors
 """ % (scan.DEFAULT_THREAD_POOL,
-        scan.DEFAULT_STREAM_CHUNK_SIZE,
-        scan.DEFAULT_STREAM_READAHEAD_LIMIT,
-        scan.MAX_POST_SIZE)
+       scan.DEFAULT_STREAM_CHUNK_SIZE,
+       scan.DEFAULT_STREAM_CHUNK_OVERLAP,
+       scan.DEFAULT_STREAM_READAHEAD_LIMIT,
+       scan.MAX_POST_SIZE)
 
 
 def match_filter(tags_filter, idents_filter, res):
@@ -199,7 +204,7 @@ def main(args):
             'recurse-dirs', 
             'path-end-exclude=', 'path-end-include=',
             'path-contains-exclude=', 'path-contains-include=',
-            'chunk-size=', 'readahead-limit=',
+            'chunk-size=', 'chunk-overlap=', 'readahead-limit=',
         ])
     except Exception as exc:
         print("Getopt error: %s" % (exc), file=sys.stderr)
@@ -294,6 +299,19 @@ def main(args):
             except ValueError:
                 print("param '%s' was not an int" % (arg), file=sys.stderr)
                 return -1
+        elif opt in ['--chunk-overlap']:
+            if ScannerClass != scan.StdinScanner:
+                ScannerClass = scan.FileChunkScanner
+            try:
+                chunk_overlap = int(arg)
+            except ValueError:
+                print("param '%s' was not an int" % (arg), file=sys.stderr)
+                return -1
+            if chunk_overlap < 0 or chunk_overlap > 99:
+                print("chunk-overlap value must be between 0 - 99", 
+                        file=sys.stderr)
+                return -1
+            scanner_kwargs['stream_chunk_overlap'] = chunk_overlap 
         elif opt in ['--chunk-size']:
             if ScannerClass != scan.StdinScanner:
                 ScannerClass = scan.FileChunkScanner
@@ -336,6 +354,10 @@ def main(args):
             return 0
 
         print("Building %s" % ScannerClass.__name__, file=sys.stderr)
+        for k, v in scanner_kwargs.items():
+            if k == 'args': 
+                continue
+            print("   %s=%s," % (k, repr(v)), file=sys.stderr)
         scanner = ScannerClass(**scanner_kwargs)
     except yara.YaraSyntaxError as err:
         print("Failed to load rules with the following error(s):\n%s" % \

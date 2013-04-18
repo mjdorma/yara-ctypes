@@ -21,7 +21,7 @@ Scanner command line interface.
 
 
 __help__ = """
-NAME scan - Scan files or processes against yara signatures
+NAME yara-ctypes Scan files or processes against YARA rules
 
 SYNOPSIS
     yara-ctypes [OPTIONS]... [FILE(s)|PID(s)]...
@@ -52,6 +52,12 @@ Scanner control:
 File control:
     --recurse-dirs 
         recurse directories specified in FILE(s) 
+
+    --filesize-lt=
+        exclude files which are less then this value
+
+    --filesize-gt=
+        exclude files which are greater then then value
 
     --path-end-include=[end1,end2,end3, ...]
         path endings inclusion filter (comma separate list)
@@ -109,8 +115,15 @@ Scan output control:
     --simple 
         print the filepath and the rule which was hit
 
-    -e 
-        don't output scan errors
+    --error-log=
+        write scan errors out to this error log
+
+Other:
+    --version 
+        print the version of yara-ctypes
+
+    -h, --help 
+        print this help
 """ % (scan.DEFAULT_THREAD_POOL,
        scan.DEFAULT_STREAM_CHUNK_SIZE,
        scan.DEFAULT_STREAM_CHUNK_OVERLAP,
@@ -141,56 +154,76 @@ def match_filter(tags_filter, idents_filter, res):
     return res
 
 
-STATUS_TEMPLATE = "scan queue: %-7s result queue: %-7s"
-def run_scan(scanner, 
-                stream=None,
-                stream_fmt=str,
-                output_errors=True, 
+STATUS = """\033[2A\033[0G\
+   scanned: %-8s      matches: %-8s             
+                           errors: %-7s          
+scan queue: %-7s  result queue: %-7s       """ 
+def print_status(scanner):
+    sys.stderr.write(STATUS % (scanner.scanned, scanner.matches, 
+                            scanner.errors, scanner.sq_size, scanner.rq_size))
+
+
+def run_scanner(scanner, 
+                out_stream=None,
+                out_stream_fmt=str,
+                err_stream=None,
                 output_simple=False,
                 tags_filter=None,
                 idents_filter=None
             ):
-    if stream is None:
-        stream = sys.stdout
-    i = 0
-    for arg, res in scanner:
-        if i % 20 == 0:
-            status = STATUS_TEMPLATE % (scanner.sq_size, scanner.rq_size)
-            sys.stderr.write("\b" * len(status) + status)
-        i += 1
-        if not res:
-            continue 
+    if out_stream is None:
+        out_stream = sys.stdout
+    stime = time.time()
+    try:
+        for arg, res in scanner:
+            print_status(scanner)
+            if not res:
+                continue   
 
-        if output_simple:
-            if type(res) is not dict:
-                continue
-            stream.write("%s:" % arg)
-            for namespace, hits in res.items():
-                for hit in hits:
-                    stream.write(" %s.%s" % (namespace, hit['rule']))
-            stream.write("\n")
-        else:
             if type(res) is dict:
+                if out_stream == sys.stdout:
+                    sys.stderr.write("\033[2A\033[0G")
+                    sys.stderr.flush()
                 res = match_filter(tags_filter, idents_filter, res)
+                if not res:
+                    continue 
+                if output_simple:
+                    out_stream.write("%s:" % arg)
+                    for namespace, hits in res.items():
+                        for hit in hits:
+                            out_stream.write(" %s.%s" % (namespace,
+                                                         hit['rule']))
+                    out_stream.write("\n")
+                else:
+                    try:
+                        formatted_res = out_stream_fmt(res)
+                    except Exception as exc:
+                        exc.error = "Failed to render res\n%s\n%s" % (\
+                                        res, traceback.format_exc())
+                        raise 
+                    print("<scan arg='%s'>" % arg, file=out_stream)
+                    print(formatted_res, file=out_stream)
+                    print("</scan>", file=out_stream)
+                    out_stream.flush()
+                if out_stream == sys.stdout:
+                    sys.stderr.write("\n\n")
+                    sys.stderr.flush()
             else:
-                if output_errors is False:
-                    continue
-            if res:
-                try:
-                    formatted_res = stream_fmt(res)
-                except Exception as exc:
-                    exc.error = "Failed to render res\n%s\n%s" % (\
-                                    res, traceback.format_exc())
-                    raise 
-                print("<scan arg='%s'>" % arg, file=stream)
-                print(formatted_res, file=stream)
-                print("</scan>", file=stream)
-    return 0
+                if err_stream is not None:
+                    print("<scan arg='%s'>%s</scan>" % (arg, res),
+                                                        file=err_stream)
+    finally:
+        print_status(scanner)
+        sys.stderr.write("\nwaiting scanner ... ")
+        scanner.quit.set() 
+        scanner.join()
+        print("scan completed after %0.02fs." % (time.time()-stime), 
+                file=sys.stderr)
 
 
 def main(args):
     try:
-        opts, args = getopt(args, 'hw:b:t:o:i:d:er:', ['help',
+        opts, args = getopt(args, 'hw:b:t:o:i:d:r:', ['help', 'version',
             'list',
             'mode=',
             'thread-pool=',
@@ -201,7 +234,9 @@ def main(args):
             'fast',
             'fmt=',
             'simple',
+            'error-log',
             'recurse-dirs', 
+            'filesize-lt=', 'filesize-gt=',
             'path-end-exclude=', 'path-end-include=',
             'path-contains-exclude=', 'path-contains-include=',
             'chunk-size=', 'chunk-overlap=', 'readahead-limit=',
@@ -220,19 +255,21 @@ def main(args):
 
     list_rules = False
     run_scan_kwargs = {}
-    rules_rootpath = yara.YARA_RULES_ROOT
 
     for opt, arg in opts:
         if opt in ['-h', '--help']:
             print(__help__)
             return 0
+        elif opt in ['--version']:
+            print("yara-ctypes version %s" % yara.__version__)
+            return 0
         elif opt in ['--list']:
             list_rules = True
 
         elif opt in ['-o']:
-            run_scan_kwargs['stream'] = open(arg, 'wb')
-        elif opt in ['-e']:
-            run_scan_kwargs['output_errors'] = False
+            run_scan_kwargs['out_stream'] = open(arg, 'wb')
+        elif opt in ['--error-log']:
+            run_scan_kwargs['err_stream'] = open(arg, 'wb')
         elif opt in ['--simple']:
             run_scan_kwargs['output_simple'] = True 
         elif opt in ['-t']:
@@ -241,20 +278,20 @@ def main(args):
             run_scan_kwargs['idents_filter'] = arg
         elif opt in ['--fmt']:
             if arg == 'pickle':
-                stream_fmt = pickle.dumps
+                out_stream_fmt = pickle.dumps
             elif arg == 'json':
-                stream_fmt = lambda a: json.dumps(a, ensure_ascii=False,
+                out_stream_fmt = lambda a: json.dumps(a, ensure_ascii=False,
                                                 check_circular=False, indent=4)
             elif arg == 'pprint':
-                stream_fmt = pprint.pformat
+                out_stream_fmt = pprint.pformat
             elif arg == 'marshal':
-                stream_fmt = marshal.dumps
+                out_stream_fmt = marshal.dumps
             elif arg == 'dict':
-                stream_fmt = str
+                out_stream_fmt = str
             else:
                 print("unknown output format %s" % arg, file=sys.stderr)
                 return -1
-            run_scan_kwargs['stream_fmt'] = stream_fmt 
+            run_scan_kwargs['out_stream_fmt'] = out_stream_fmt 
 
         elif opt in ['-r', '--rule']:
             if not os.path.exists(arg):
@@ -269,8 +306,7 @@ def main(args):
             if not os.path.exists(arg):
                 print("root path '%s' does not exist" % arg, file=sys.stderr)
                 return -1
-            rules_rootpath = os.path.abspath(arg)
-            scanner_kwargs['rules_rootpath'] = rules_rootpath 
+            scanner_kwargs['rules_rootpath'] = os.path.abspath(arg) 
         elif opt in ['-d']:
             try:
                 if 'externals' not in scanner_kwargs:
@@ -281,6 +317,18 @@ def main(args):
                 return -1
         elif opt in ['--fast']:
             scanner_kwargs['fast_match'] = True
+        elif opt in ['--filesize-lt']:
+            try:
+                scanner_kwargs['filesize_lt'] = int(arg)
+            except ValueError:
+                print("param '%s' was not an int" % (arg), file=sys.stderr)
+                return -1
+        elif opt in ['--filesize-gt']:
+            try:
+                scanner_kwargs['filesize_gt'] = int(arg)
+            except ValueError:
+                print("param '%s' was not an int" % (arg), file=sys.stderr)
+                return -1
         elif opt in ['--path-end-include']:
             scanner_kwargs['path_end_include'] = arg.split(',')
         elif opt in ['--path-end-exclude']:
@@ -362,28 +410,28 @@ def main(args):
     except yara.YaraSyntaxError as err:
         print("Failed to load rules with the following error(s):\n%s" % \
                 "\n".join([e for _,_,e in err.errors]), file=sys.stderr)
-        blacklist = set()
-        for f, _, _ in err.errors:
-            f = os.path.splitext(f[len(rules_rootpath)+1:])[0]
-            blacklist.add(f.replace(os.path.sep, '.'))
-        print("\nYou could blacklist the erroneous rules using:", 
-                file=sys.stderr)
-        print(" --blacklist=%s" % ",".join(blacklist), file=sys.stderr)
+        
+        if 'rule_filepath' not in scanner_kwargs: 
+            rules_rootpath = scanner_kwargs.get('rules_rootpath', 
+                                                yara.YARA_RULES_ROOT)
+            blacklist = set()
+            for f, _, _ in err.errors:
+                f = os.path.splitext(f[len(rules_rootpath)+1:])[0]
+                blacklist.add(f.replace(os.path.sep, '.'))
+            print("\nYou could blacklist the erroneous rules using:", 
+                    file=sys.stderr)
+            print(" --blacklist=%s" % ",".join(blacklist), file=sys.stderr)
         return -1
     except Exception as exc:
         print("Failed to build Scanner with error: %s" % exc, file=sys.stderr)
         return -1
 
     try:
-        stime = time.time()
-        return run_scan(scanner, **run_scan_kwargs) 
-    finally:
-        scanner.quit.set()
-        scanner.join()
-        status = STATUS_TEMPLATE % (scanner.sq_size, scanner.rq_size)
-        sys.stderr.write("\b" * len(status) + status)
-        print("\nscanned %s items in %0.02fs... done." % (scanner.scanned,
-                time.time()-stime), file=sys.stderr)
+        run_scanner(scanner, **run_scan_kwargs) 
+    except KeyboardInterrupt:
+        pass
+
+    return 0
 
 
 entry = lambda : sys.exit(main(sys.argv[1:]))

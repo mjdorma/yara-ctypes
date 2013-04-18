@@ -53,10 +53,10 @@ File control:
     --recurse-dirs 
         recurse directories specified in FILE(s) 
 
-    --filesize-lt=
+    --exclude-filesize-lt=
         exclude files which are less then this value
 
-    --filesize-gt=
+    --exclude-filesize-gt=
         exclude files which are greater then then value
 
     --path-end-include=[end1,end2,end3, ...]
@@ -236,7 +236,7 @@ def main(args):
             'simple',
             'error-log',
             'recurse-dirs', 
-            'filesize-lt=', 'filesize-gt=',
+            'exclude-filesize-lt=', 'exclude-filesize-gt=',
             'path-end-exclude=', 'path-end-include=',
             'path-contains-exclude=', 'path-contains-include=',
             'chunk-size=', 'chunk-overlap=', 'readahead-limit=',
@@ -317,13 +317,13 @@ def main(args):
                 return -1
         elif opt in ['--fast']:
             scanner_kwargs['fast_match'] = True
-        elif opt in ['--filesize-lt']:
+        elif opt in ['--exclude-filesize-lt']:
             try:
                 scanner_kwargs['filesize_lt'] = int(arg)
             except ValueError:
                 print("param '%s' was not an int" % (arg), file=sys.stderr)
                 return -1
-        elif opt in ['--filesize-gt']:
+        elif opt in ['--exclude-filesize-gt']:
             try:
                 scanner_kwargs['filesize_gt'] = int(arg)
             except ValueError:

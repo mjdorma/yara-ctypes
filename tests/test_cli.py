@@ -21,8 +21,8 @@ def run_main(*args):
         finally:
             sys.stdout.seek(0)
             sys.stderr.seek(0)
-            stdout = sys.stdout.read()
-            stderr = sys.stderr.read()
+            stdout = sys.stdout.read().strip()
+            stderr = sys.stderr.read().strip()
             sys.stdout = sys.__stdout__
             sys.stderr = sys.__stderr__
     except Exception as exc:
@@ -36,8 +36,7 @@ class TestCLI(unittest.TestCase):
     def test_help(self):
         ret, stdout, stderr = run_main('--help')
         self.assertEqual(ret, 0)
-        stdout = stdout.strip()
-        self.assertTrue(stdout.startswith('NAME scan'))
+        self.assertTrue(stdout.startswith('NAME yara-ctypes'))
 
     def test_broken_opt(self):
         ret, stdout, stderr = run_main('--no-an-opt-opt')
@@ -70,7 +69,7 @@ class TestCLI(unittest.TestCase):
                 raise
             self.assertEqual(ret, 0)
             self.assertTrue(stdout)
-            self.assertTrue("scanned 1 items" in stderr)
+            self.assertTrue("scanned: 1" in stderr)
         
         ret, stdout, stderr = run_main('--fmt=doesnotexist')
         self.assertTrue("unknown output format" in stderr)

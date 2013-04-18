@@ -222,7 +222,7 @@ class PathScanner(Scanner):
 
     def exclude_path(self, path):
         def do_test(pathtest, tests):
-            return bool(filter(lambda test:pathtest(test), tests))
+            return bool([a for a in filter(lambda test:pathtest(test), tests)])
 
         if self._filesize_gt is not None:
             filesize = os.path.getsize(path)

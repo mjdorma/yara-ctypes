@@ -296,3 +296,25 @@ rule TestExtern
         self.assertTrue('main' not in res, 
                     msg='Failed to set ext_var to False')
 
+
+class TestComments(unittest.TestCase):
+    def test_comments(self):
+        """confirm commented rules are not breaking the rule build"""
+        source = """
+rule testRule1
+{
+    meta:
+        author="Test"
+        comment="Test 2"
+
+    strings:
+        //the str define below was breaking one of the 1.7.x builds
+        $test_str = "Accept: */ /* */  */"
+
+    condition:
+        $test_str
+}
+"""
+        rules = yara.compile(source=source)
+
+

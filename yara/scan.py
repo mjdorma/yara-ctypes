@@ -35,6 +35,7 @@ class Scanner(object):
                        stream_chunk_size=DEFAULT_STREAM_CHUNK_SIZE,
                        stream_chunk_overlap=DEFAULT_STREAM_CHUNK_OVERLAP,
                        stream_readahead_limit=DEFAULT_STREAM_READAHEAD_LIMIT,
+                       stream_chunk_read_max=None,
                        externals={}, **kwargs):
         """Scanner - base Scanner class
 
@@ -47,6 +48,7 @@ class Scanner(object):
             fast_match - scan fast True / False 
             stream_chunk_size - size in bytes to read from a stream 
             steram_readahead_limit - size in bytes limit for stream read ahead
+            stream_chunk_read_max - max number of chunks to read from a stream
             externals - externally defined variables             
 
         Note: 
@@ -68,6 +70,7 @@ class Scanner(object):
         self._chunk_size = stream_chunk_size
         self._chunk_overlap = int((stream_chunk_size * \
                                   stream_chunk_overlap) / 100)
+        self._stream_chunk_read_max = stream_chunk_read_max  
         self._max_sq_size = int((stream_readahead_limit / \
                              (stream_chunk_size + self._chunk_overlap)) + 1)
         self._jq = Queue()
@@ -118,12 +121,17 @@ class Scanner(object):
     def enqueue_stream(self, stream, basetag='stream'):
         data = stream.read(self._chunk_size + self._chunk_overlap)
         read_bytes = self._chunk_size - self._chunk_overlap
+        read_max = self._stream_chunk_read_max  
         chunk_id = 0
         chunk_start = 0
         while data and not self.quit.is_set():
             chunk_end = chunk_start + len(data)
             tag = "%s[%s:%s]" % (basetag, chunk_start, chunk_end)
             self.enqueue_data(tag, data)
+            if read_max is not None:
+                read_max =- 1
+                if read_max <= 0:
+                    break
             while self.sq_size > self._max_sq_size and \
                         not self.quit.is_set():
                 time.sleep(0.1)
@@ -377,35 +385,4 @@ class SyncScanner(Scanner):
     def match_data(self, data_list, **match_kwargs):
         return self._sync_scan(self.enqueue_data, data_list, match_kwargs)
 
-
-MAX_POST_SIZE = 2**20 * 100 # 100 MB
-#   import bottle
-#   import json
-#   import httplib
-#   class ScannerWebAPI(object):
-#       def __init__(self, max_post_size=MAX_POST_SIZE, scanner):
-#           self._max_post_size = max_post_size 
-#           self.scanner = scanner 
-
-#       @bottle.post("scan")
-#       def scan(self):
-#           filenames = []
-#           data = []
-#           bytes_remaining = self._max_post_size
-#           for filename, field in request.files.iteritems():
-#               if bytes_remaining <= 0:
-#                   bottle.abbort(httplib.REQUEST_ENTITY_TOO_LARGE, 
-#                           'POST was > %s bytes' % MAX_POST_SIZE)
-#               d = field.file.read(bytes_remaining)
-#               bytes_remaining -= len(data)
-#               filenames.append(filename)
-#               data.append(d)
-
-#           try:
-#               res = self.scanner.match_data(data)
-#               results = zip(filenames, res)
-#           except:
-#               bottle.abort(httplib.INTERNAL_SERVER_ERROR, traceback.format_exc())
-
-#           return results 
 

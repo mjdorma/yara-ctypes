@@ -70,7 +70,6 @@ Ubuntu 11.10 |build_status|:
  + CPython 2.7 (32bit)
  + CPython 3.2 (32bit)
  + CPython 3.3 (32bit) 
- + PyPy 1.9.0 (32bit) 
 
 Windows 7:
 

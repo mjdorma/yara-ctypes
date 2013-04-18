@@ -45,6 +45,9 @@ Scanner control:
     --chunk-overlap=%s
         percentage from 0 - 99 %% of data to be reprocesses on block boundaries
 
+    --chunk-read-max=
+        set the maximum chunks to read from a stream
+
     --readhead-limit=%s
         maximum number of bytes to read ahead when reading data from a stream
 
@@ -235,6 +238,7 @@ def main(args):
             'path-end-exclude=', 'path-end-include=',
             'path-contains-exclude=', 'path-contains-include=',
             'chunk-size=', 'chunk-overlap=', 'readahead-limit=',
+            'chunk-read-max=',
         ])
     except Exception as exc:
         print("Getopt error: %s" % (exc), file=sys.stderr)
@@ -342,6 +346,19 @@ def main(args):
             except ValueError:
                 print("param '%s' was not an int" % (arg), file=sys.stderr)
                 return -1
+        elif opt in ['--chunk-read-max']:
+            if ScannerClass != scan.StdinScanner:
+                ScannerClass = scan.FileChunkScanner
+            try:
+                chunk_read_max = int(arg)
+            except ValueError:
+                print("param '%s' was not an int" % (arg), file=sys.stderr)
+                return -1
+            if chunk_read_max < 1:
+                print("chunk-read-max value must be greater than 0", 
+                        file=sys.stderr)
+                return -1
+            scanner_kwargs['stream_chunk_read_max'] = chunk_read_max 
         elif opt in ['--chunk-overlap']:
             if ScannerClass != scan.StdinScanner:
                 ScannerClass = scan.FileChunkScanner

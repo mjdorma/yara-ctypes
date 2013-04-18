@@ -154,13 +154,17 @@ def match_filter(tags_filter, idents_filter, res):
     return res
 
 
-STATUS = """\033[2A\033[0G\
-   scanned: %-8s      matches: %-8s             
-                           errors: %-7s          
-scan queue: %-7s  result queue: %-7s       """ 
+STATUS = "\
+scanned: %-8s matches: %-4s errors: %-4s scan queue: %-8s res queue: %-7s" 
+def clear_status(scanner):
+    status = STATUS % (scanner.scanned, scanner.matches, 
+                            scanner.errors, scanner.sq_size, scanner.rq_size)
+    sys.stderr.write("\b" * len(status))
+
 def print_status(scanner):
-    sys.stderr.write(STATUS % (scanner.scanned, scanner.matches, 
-                            scanner.errors, scanner.sq_size, scanner.rq_size))
+    status = STATUS % (scanner.scanned, scanner.matches, 
+                            scanner.errors, scanner.sq_size, scanner.rq_size)
+    sys.stderr.write("\b" * len(status) + status)
 
 
 def run_scanner(scanner, 
@@ -182,8 +186,7 @@ def run_scanner(scanner,
 
             if type(res) is dict:
                 if out_stream == sys.stdout:
-                    sys.stderr.write("\033[2A\033[0G")
-                    sys.stderr.flush()
+                    clear_status(scanner)
                 res = match_filter(tags_filter, idents_filter, res)
                 if not res:
                     continue 
@@ -205,9 +208,6 @@ def run_scanner(scanner,
                     print(formatted_res, file=out_stream)
                     print("</scan>", file=out_stream)
                     out_stream.flush()
-                if out_stream == sys.stdout:
-                    sys.stderr.write("\n\n")
-                    sys.stderr.flush()
             else:
                 if err_stream is not None:
                     print("<scan arg='%s'>%s</scan>" % (arg, res),

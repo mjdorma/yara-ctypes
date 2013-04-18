@@ -96,6 +96,11 @@ with GitHub's issues system.
 Change log
 ==========
 
+version 1.7.2 (19/04/2013)
+
+* cli improvements
+* bug fixes 
+
 version 1.7.1 (17/04/2013)
 
 * StdinScanner 

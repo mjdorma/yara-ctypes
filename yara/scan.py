@@ -3,7 +3,7 @@ import sys
 import os
 import traceback
 from glob import glob
-from threading import Thread, Event, Lock
+from threading import Thread, Event
 if sys.version_info[0] < 3: #major
     from Queue import Queue, Empty
 else:
@@ -73,8 +73,10 @@ class Scanner(object):
         self._jq = Queue()
         self._rq = Queue()
         self._empty = Event()
-        self._threadpool = []
+        self._pool = []
         self.scanned = 0
+        self.matches = 0
+        self.errors = 0
         self.quit = Event()
         atexit.register(self.quit.set)
 
@@ -82,7 +84,7 @@ class Scanner(object):
             t = Thread(target=self._run)
             t.daemon = True
             t.start()
-            self._threadpool.append(t)
+            self._pool.append(t)
         
         if self.enqueuer is not None:
             t = Thread(target=self.enqueuer)
@@ -157,18 +159,21 @@ class Scanner(object):
                 self.scanned += 1
                 f, t, a, k = job
                 r = f(*a, **k)
+                if r:
+                    self.matches += 1
             except Exception:
+                self.errors += 1
                 r = traceback.format_exc()
             finally:
                 self._rq.put((t, r))
                 self._jq.task_done()
 
     def join(self, timeout=None):
-        for t in self._threadpool:
+        for t in self._pool:
             t.join(timeout=timeout)
 
     def is_alive(self):
-        for t in self._threadpool:
+        for t in self._pool:
             if t.is_alive():
                 return True
         return False
@@ -188,6 +193,7 @@ class Scanner(object):
 
 class PathScanner(Scanner):
     def __init__(self, args=[], recurse_dirs=False, 
+                filesize_gt=None, filesize_lt=None,
                 path_end_include=None, path_end_exclude=None, 
                 path_contains_include=None, path_contains_exclude=None, 
                 **scanner_kwargs):
@@ -199,6 +205,8 @@ class PathScanner(Scanner):
                 raise ValueError("Error reading path '%s'" % path)
             self._paths.extend(paths)
         self._recurse_dirs = recurse_dirs
+        self._filesize_gt=filesize_gt
+        self._filesize_lt=filesize_lt
         self._path_end_include = path_end_include
         self._path_end_exclude = path_end_exclude
         self._path_contains_include = path_contains_include
@@ -208,11 +216,23 @@ class PathScanner(Scanner):
     def enqueuer(self):
         for path in self.paths:
             self.enqueue_path(path, path)
+            if self.quit.is_set():
+                break
         self.enqueue_end()
 
     def exclude_path(self, path):
         def do_test(pathtest, tests):
             return bool(filter(lambda test:pathtest(test), tests))
+
+        if self._filesize_gt is not None:
+            filesize = os.path.getsize(path)
+            if filesize > self._filesize_gt:
+                return True
+
+        if self._filesize_lt is not None:
+            filesize = os.path.getsize(path)
+            if filesize < self._filesize_lt:
+                return True
 
         if self._path_contains_exclude is not None:
             if do_test(path.__contains__, self._path_contains_exclude):
@@ -224,13 +244,13 @@ class PathScanner(Scanner):
 
         exclude_on_not_include = False
         if self._path_contains_include is not None:
-            if not do_test(path.__contains__, self._path_contains_include):
+            if do_test(path.__contains__, self._path_contains_include):
                 return False
             else:
                 exclude_on_not_include = True 
 
         if self._path_end_include is not None:
-            if not do_test(path.endswith, self._path_end_include):
+            if do_test(path.endswith, self._path_end_include):
                 return False
             else:
                 exclude_on_not_include = True
@@ -291,6 +311,8 @@ class FileChunkScanner(PathScanner):
                 print("Failed to enqueue %s - %s" % (path,
                                 traceback.format_exc()), 
                             file=sys.stderr)
+            if self.quit.is_set():
+                break
         self.enqueue_end()
 
 
@@ -307,7 +329,6 @@ class StdinScanner(Scanner):
 class SyncScanner(Scanner):
     """Synchronised matching - take advantage of Scanner synchronously""" 
     def __init__(self, **scanner_kwargs):
-        self._scan_id_lock = Lock()
         self._scan_id = 0
         self._new_results = Event()
         self.enqueuer = self.dequeuer # dequeuing thread
@@ -330,14 +351,13 @@ class SyncScanner(Scanner):
     def _sync_scan(self, enqueue_fnc, args, match_kwargs):
         results = {}
         scan_ids = []
-        with self._scan_id_lock:
-            for arg in args:
-                self._scan_id += 1
-                scan_id = self._scan_id
-                scan_ids.append(scan_id)
-                results[scan_id] = None
-                a = (scan_id, arg)
-                enqueue_fnc(*a, **match_kwargs)
+        for arg in args:
+            self._scan_id += 1
+            scan_id = self._scan_id
+            scan_ids.append(scan_id)
+            results[scan_id] = None
+            a = (scan_id, arg)
+            enqueue_fnc(*a, **match_kwargs)
 
         while not self.quit.is_set():
             for scan_id in scan_ids:

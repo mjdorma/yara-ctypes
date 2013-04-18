@@ -303,10 +303,6 @@ class TestComments(unittest.TestCase):
         source = """
 rule testRule1
 {
-    meta:
-        author="Test"
-        comment="Test 2"
-
     strings:
         //the str define below was breaking one of the 1.7.x builds
         $test_str = "Accept: */ /* */  */"

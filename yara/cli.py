@@ -48,7 +48,6 @@ Scanner control:
     --readhead-limit=%s
         maximum number of bytes to read ahead when reading data from a stream
 
-
 File control:
     --recurse-dirs 
         recurse directories specified in FILE(s) 
@@ -97,9 +96,6 @@ Rules control:
         Use the rule file specified by this input argument and ignore the
         YARA namespaces
 
-Web control:
-    --max-post-size=%s
-
 Scan output control:
     --fmt=dict
         output format [dict|pprint|json|pickle|marshal]
@@ -116,7 +112,7 @@ Scan output control:
         print the filepath and the rule which was hit
 
     --error-log=
-        write scan errors out to this error log
+        write scan errors out to error-log
 
 Other:
     --version 
@@ -127,8 +123,7 @@ Other:
 """ % (scan.DEFAULT_THREAD_POOL,
        scan.DEFAULT_STREAM_CHUNK_SIZE,
        scan.DEFAULT_STREAM_CHUNK_OVERLAP,
-       scan.DEFAULT_STREAM_READAHEAD_LIMIT,
-       scan.MAX_POST_SIZE)
+       scan.DEFAULT_STREAM_READAHEAD_LIMIT)
 
 
 def match_filter(tags_filter, idents_filter, res):

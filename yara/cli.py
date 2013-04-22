@@ -417,7 +417,7 @@ def main(args):
         for k, v in scanner_kwargs.items():
             if k == 'args': 
                 continue
-            print("   %s=%s," % (k, repr(v)), file=sys.stderr)
+            print("   %s=%s" % (k, repr(v)), file=sys.stderr)
         scanner = ScannerClass(**scanner_kwargs)
     except yara.YaraSyntaxError as err:
         print("Failed to load rules with the following error(s):\n%s" % \
@@ -439,6 +439,9 @@ def main(args):
         return -1
 
     try:
+        print("Run scanner", file=sys.stderr)
+        for k, v in run_scan_kwargs.items():
+            print("   %s=%s" % (k, repr(v)), file=sys.stderr)
         run_scanner(scanner, **run_scan_kwargs) 
     except KeyboardInterrupt:
         pass

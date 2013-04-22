@@ -224,45 +224,36 @@ class PathScanner(Scanner):
     def enqueuer(self):
         for path in self.paths:
             self.enqueue_path(path, path)
-            if self.quit.is_set():
-                break
         self.enqueue_end()
 
     def exclude_path(self, path):
         def do_test(pathtest, tests):
             return bool([a for a in filter(lambda test:pathtest(test), tests)])
-
         if self._filesize_gt is not None:
             filesize = os.path.getsize(path)
             if filesize > self._filesize_gt:
                 return True
-
         if self._filesize_lt is not None:
             filesize = os.path.getsize(path)
             if filesize < self._filesize_lt:
                 return True
-
         if self._path_contains_exclude is not None:
             if do_test(path.__contains__, self._path_contains_exclude):
                 return True
-
         if self._path_end_exclude is not None:
             if do_test(path.endswith, self._path_end_exclude):
                 return True
-
         exclude_on_not_include = False
         if self._path_contains_include is not None:
             if do_test(path.__contains__, self._path_contains_include):
                 return False
             else:
                 exclude_on_not_include = True 
-
         if self._path_end_include is not None:
             if do_test(path.endswith, self._path_end_include):
                 return False
             else:
                 exclude_on_not_include = True
-
         return False or exclude_on_not_include
 
     @property
@@ -275,11 +266,14 @@ class PathScanner(Scanner):
                 filenames = [f for f, _ in \
                                 filter(lambda o: not os.path.isdir(o[1]), ls) ]
                 return [(d, [] , filenames)]
-
         for p in self._paths:
+            if self.quit.is_set():
+               return 
             if os.path.isdir(p):
                 for dirpath, dirnames, filenames in listdir(p):
                     for filename in filenames:
+                        if self.quit.is_set():
+                            return
                         a = os.path.join(dirpath, filename)
                         if self.exclude_path(a):
                             continue
@@ -319,8 +313,6 @@ class FileChunkScanner(PathScanner):
                 print("Failed to enqueue %s - %s" % (path,
                                 traceback.format_exc()), 
                             file=sys.stderr)
-            if self.quit.is_set():
-                break
         self.enqueue_end()
 
 

@@ -3,11 +3,19 @@ import sys
 import os
 import traceback
 from glob import glob
-from threading import Thread, Event
+from threading import Thread
+from threading import Event as ThreadEvent
 if sys.version_info[0] < 3: #major
-    from Queue import Queue, Empty
+    from Queue import Queue as ThreadQueue
+    from Queue import Empty as ThreadEmpty
 else:
-    from queue import Queue, Empty
+    from queue import Queue as ThreadQueue
+    from queue import Empty as ThreadEmpty
+from multiprocessing import Process
+from multiprocessing import Event as ProcessEvent
+from multiprocessing.queues import Queue as ProcessQueue
+from multiprocessing.queues import Empty as ProcessEmpty
+
 import time
 import atexit
 
@@ -19,72 +27,77 @@ YARA rules Scanner class definitions
 [mjdorma@gmail.com]
 """
 
-DEFAULT_THREAD_POOL = 4
+EXECUTE_THREAD = 0
+EXECUTE_PROCESS = 1
+
+DEFAULT_EXECUTE_POOL = 4
+DEFAULT_EXECUTE_TYPE = EXECUTE_THREAD
 DEFAULT_STREAM_CHUNK_SIZE = 2**20
 DEFAULT_STREAM_READAHEAD_LIMIT = 2**32
 DEFAULT_STREAM_CHUNK_OVERLAP = 1
 class Scanner(object):
     enqueuer = None 
 
-    def __init__(self, rules_rootpath=yara.YARA_RULES_ROOT,
-                       whitelist=[],
-                       blacklist=[],
-                       rule_filepath=None,
-                       thread_pool=DEFAULT_THREAD_POOL,
-                       fast_match=False,
+    def __init__(self, execute_type=DEFAULT_EXECUTE_TYPE, 
+                       execute_pool=DEFAULT_EXECUTE_POOL,
                        stream_chunk_size=DEFAULT_STREAM_CHUNK_SIZE,
                        stream_chunk_overlap=DEFAULT_STREAM_CHUNK_OVERLAP,
                        stream_readahead_limit=DEFAULT_STREAM_READAHEAD_LIMIT,
                        stream_chunk_read_max=None,
-                       externals={}, **kwargs):
+                       **rules_kwargs):
         """Scanner - base Scanner class
 
         kwargs:
+            execute_type - type of execution pool 
+
+            stream_chunk_size - size in bytes to read from a stream 
+            steram_readahead_limit - size in bytes limit for stream read ahead
+            stream_chunk_read_max - max number of chunks to read from a stream
+ 
+        rules_kwargs:
             rules_rootpath - path to the root of the rules directory
             whitelist - whitelist of rules to use in scanner
             blacklist - blacklist of rules to not use in scanner
             rule_filepath=None,
-            thread_pool - number of threads to use in scanner
+            execute_pool - number of threads to use in scanner
             fast_match - scan fast True / False 
-            stream_chunk_size - size in bytes to read from a stream 
-            steram_readahead_limit - size in bytes limit for stream read ahead
-            stream_chunk_read_max - max number of chunks to read from a stream
             externals - externally defined variables             
 
         Note: 
             define an enqueuer function if the enqueue operation will take
             a long time.  This function is executed asynchronously 
         """
-        if rule_filepath is None:
-            self._rules = yara.load_rules(rules_rootpath=rules_rootpath,
-                                      blacklist=blacklist,
-                                      whitelist=whitelist,
-                                      includes=True,
-                                      externals=externals,
-                                      fast_match=fast_match)
+        if execute_type == EXECUTE_THREAD:
+            self.Queue = ThreadQueue
+            self.Event = ThreadEvent
+            self.Empty = ThreadEmpty
+            self.Execute = Thread
         else:
-            self._rules = yara.compile(filepath=rule_filepath,
-                                      includes=True,
-                                      externals=externals,
-                                      fast_match=fast_match)
+            self.Queue = ProcessQueue
+            self.Event = ProcessEvent
+            self.Empty = ProcessEmpty
+            self.Execute = Process
+        self._execute_type = execute_type
+        self._rules_kwargs = rules_kwargs
+        self._rules = self._create_rules(**self._rules_kwargs)
         self._chunk_size = stream_chunk_size
         self._chunk_overlap = int((stream_chunk_size * \
                                   stream_chunk_overlap) / 100)
         self._stream_chunk_read_max = stream_chunk_read_max  
         self._max_sq_size = int((stream_readahead_limit / \
                              (stream_chunk_size + self._chunk_overlap)) + 1)
-        self._jq = Queue()
-        self._rq = Queue()
-        self._empty = Event()
+        self._jq = self.Queue()
+        self._rq = self.Queue()
+        self._empty = self.Event()
         self._pool = []
         self.scanned = 0
         self.matches = 0
         self.errors = 0
-        self.quit = Event()
+        self.quit = self.Event()
         atexit.register(self.quit.set)
 
-        for i in range(thread_pool):
-            t = Thread(target=self._run)
+        for i in range(execute_pool):
+            t = self.Execute(target=self._run)
             t.daemon = True
             t.start()
             self._pool.append(t)
@@ -102,21 +115,27 @@ class Scanner(object):
     @property
     def sq_size(self):
         """contains the current scan queue size"""
-        return self._jq.unfinished_tasks
+        if self._execute_type == EXECUTE_THREAD:
+            return self._jq.unfinished_tasks
+        else:
+            return self._jq.qsize() 
 
     @property
     def rq_size(self):
         """contains the current result queue size"""
-        return self._rq.unfinished_tasks
+        if self._execute_type == EXECUTE_THREAD:
+            return self._rq.unfinished_tasks
+        else:
+            return self._rq.qsize()
 
     def enqueue_path(self, tag, filepath, **match_kwargs):
-        self._jq.put((self.rules.match_path, tag, (filepath,), match_kwargs))
+        self._jq.put(("match_path", tag, (filepath,), match_kwargs))
 
     def enqueue_data(self, tag, data, **match_kwargs):
-        self._jq.put((self.rules.match_data, tag, (data,), match_kwargs))
+        self._jq.put(("match_data", tag, (data,), match_kwargs))
 
     def enqueue_proc(self, tag, pid, **match_kwargs):
-        self._jq.put((self.rules.match_proc, tag, (pid,), match_kwargs))
+        self._jq.put(("match_proc", tag, (pid,), match_kwargs))
 
     def enqueue_stream(self, stream, basetag='stream'):
         data = stream.read(self._chunk_size + self._chunk_overlap)
@@ -151,14 +170,36 @@ class Scanner(object):
         they have exhausted the queues up to queue end"""
         self._jq.put(None)
 
+    def _create_rules(self,fast_match=False, 
+                           rules_rootpath=yara.YARA_RULES_ROOT,
+                           whitelist=[],
+                           blacklist=[],
+                           rule_filepath=None,
+                           externals={}, 
+                           **kwargs):
+        if rule_filepath is None:
+            return yara.load_rules(rules_rootpath=rules_rootpath,
+                                      blacklist=blacklist,
+                                      whitelist=whitelist,
+                                      includes=True,
+                                      externals=externals,
+                                      fast_match=fast_match)
+        else:
+            return yara.compile(filepath=rule_filepath,
+                                      includes=True,
+                                      externals=externals,
+                                      fast_match=fast_match)
+
     def _run(self):
+        rules = self._create_rules(**self._rules_kwargs)
         while not self._empty.is_set() and not self.quit.is_set():
             try:
                 job = self._jq.get(timeout=0.1)
-            except Empty:
+            except self.Empty:
                 continue
             if job is None:
-                self._jq.task_done()
+                if self._execute_type == EXECUTE_THREAD:
+                    self._jq.task_done()
                 self._jq.join()
                 self._rq.put(None)
                 self._empty.set()
@@ -166,6 +207,7 @@ class Scanner(object):
             try:
                 self.scanned += 1
                 f, t, a, k = job
+                f = getattr(rules, f)
                 r = f(*a, **k)
                 if r:
                     self.matches += 1
@@ -174,7 +216,8 @@ class Scanner(object):
                 r = traceback.format_exc()
             finally:
                 self._rq.put((t, r))
-                self._jq.task_done()
+                if self._execute_type == EXECUTE_THREAD:
+                    self._jq.task_done()
 
     def join(self, timeout=None):
         for t in self._pool:
@@ -188,7 +231,8 @@ class Scanner(object):
 
     def dequeue(self):
         r = self._rq.get()
-        self._rq.task_done()
+        if self._execute_type == EXECUTE_THREAD:
+            self._rq.task_done()
         return r
 
     def __iter__(self):

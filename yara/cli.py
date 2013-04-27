@@ -235,7 +235,7 @@ def main(args):
             'fast',
             'fmt=',
             'simple',
-            'error-log',
+            'error-log=',
             'recurse-dirs', 
             'exclude-filesize-lt=', 'exclude-filesize-gt=',
             'path-end-exclude=', 'path-end-include=',

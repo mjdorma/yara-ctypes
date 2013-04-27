@@ -95,6 +95,11 @@ with GitHub's issues system.
 Change log
 ==========
 
+version 1.7.3 (28/04/2013)
+
+* scan using a process pool or thread pool
+* bug fixes and more testing
+
 version 1.7.2 (19/04/2013)
 
 * cli improvements

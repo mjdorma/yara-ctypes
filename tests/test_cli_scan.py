@@ -245,7 +245,7 @@ class TestScan(unittest.TestCase):
     def test_globbed_path(self):
         ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', 
                 "tests%s*.py" % os.path.sep)
-        self.assertTrue("test_cli.py: main.Bird01" in stdout)
+        self.assertTrue("test_cli_scan.py: main.Bird01" in stdout)
         self.assertEqual(ret, 0)
 
     def test_mode_chunk(self):

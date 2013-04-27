@@ -8,6 +8,12 @@ import platform
 import os
 import sys
 
+if 'test' in sys.argv:
+    # Setup test unloads modules after the tests have completed. This causes an
+    # error in atexit's exit calls because the registered modules no longer
+    # exist.  This hack resolves this issue by disabling the register func
+    import atexit
+    atexit.register = lambda be_gone_nasty_traceback: True
 
 def load_version(filename='yara/version.py'):
     """Parse a __version__ number from a source file"""

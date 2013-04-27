@@ -36,8 +36,11 @@ Scanner control:
         proc  -enqueues PID(s) for process scanning
         stdin -read from the stdin stream. 
 
-    --thread-pool=%s
-        size of the thread pool used in the Scanner instance 
+    --execute-pool=%s
+        size of the execute pool used in the Scanner instance 
+
+    --execute-type=[thread|process]
+        choose to scan using a process pool or a thread pool
 
     --chunk-size=%s
         size of data in bytes to read and enqueue from data read from a stream
@@ -123,7 +126,7 @@ Other:
 
     -h, --help 
         print this help
-""" % (scan.DEFAULT_THREAD_POOL,
+""" % (scan.DEFAULT_EXECUTE_POOL,
        scan.DEFAULT_STREAM_CHUNK_SIZE,
        scan.DEFAULT_STREAM_CHUNK_OVERLAP,
        scan.DEFAULT_STREAM_READAHEAD_LIMIT)
@@ -224,7 +227,7 @@ def main(args):
         opts, args = getopt(args, 'hw:b:t:o:i:d:r:', ['help', 'version',
             'list',
             'mode=',
-            'thread-pool=',
+            'execute-pool=', 'execute-mode=', 
             'rule=',
             'root=',
             'whitelist=',
@@ -380,14 +383,22 @@ def main(args):
             except ValueError:
                 print("param '%s' was not an int" % (arg), file=sys.stderr)
                 return -1
-        elif opt in ['t', '--thread-pool']:
+        elif opt in ['--execute-mode']:
+            if arg == 'thread':
+                scanner_kwargs['execute_mode'] = scan.EXECUTE_THREAD
+            elif arg == 'process':
+                scanner_kwargs['execute_mode'] = scan.EXECUTE_PROCESS
+            else:
+                print("unknown execute mode '%s'" % arg)
+                return -1
+        elif opt in ['--execute-pool']:
             try:
-                scanner_kwargs['thread_pool'] = int(arg)
+                scanner_kwargs['execute_pool'] = int(arg)
             except ValueError:
                 print("param '%s' was not an int" % (arg), file=sys.stderr)
                 return -1
-            if scanner_kwargs['thread_pool'] < 1:
-                print("--thread-pool value can not be lower than 1",
+            if scanner_kwargs['execute_pool'] < 1:
+                print("--execute-pool value can not be lower than 1",
                         file=sys.stderr)
                 return -1
         elif opt in ['--mode']:
@@ -408,7 +419,7 @@ def main(args):
     #build scanner object
     try:
         if list_rules == True:
-            scanner_kwargs['thread_pool'] = 0
+            scanner_kwargs['execute_pool'] = 0
             scanner = scan.Scanner(**scanner_kwargs)
             print(scanner.rules)
             return 0

@@ -325,7 +325,7 @@ class TestScan(unittest.TestCase):
         self.assertTrue("param 'bad' was not an int" in stderr)
 
 
-class TestScanProcessPool(TestCLI):
+class TestScanProcessPool(TestScan):
     def _run_main(self, *a):
         a = list(a)
         a.insert(0, '--execute-mode=process')

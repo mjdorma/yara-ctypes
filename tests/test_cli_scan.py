@@ -33,8 +33,8 @@ def run_main(*args):
         raise 
     return (ret, stdout, stderr)
 
-class TestScan(unittest.TestCase):
 
+class TestCLI(unittest.TestCase):
     def test_help(self):
         ret, stdout, stderr = run_main('--help')
         self.assertEqual(ret, 0)
@@ -50,6 +50,8 @@ class TestScan(unittest.TestCase):
         self.assertEqual(ret, 0)
         self.assertTrue("example.packer_rules" in stdout)
 
+
+class TestScan(unittest.TestCase):
     def test_select_yarafile(self):
         ret, stdout, stderr = run_main('-r', BIRD_YAR, '.')
         self.assertTrue("does not exist" not in stderr, msg="got %s" % stderr)

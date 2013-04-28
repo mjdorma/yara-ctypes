@@ -222,6 +222,40 @@ def run_scanner(scanner,
                 file=sys.stderr)
 
 
+def build_rules(fast_match=False, 
+                   rules_rootpath=yara.YARA_RULES_ROOT,
+                   whitelist=[],
+                   blacklist=[],
+                   rule_filepath=None,
+                   externals={}):
+    try:
+        if rule_filepath is None:
+            return yara.load_rules(rules_rootpath=rules_rootpath,
+                                   blacklist=blacklist,
+                                   whitelist=whitelist,
+                                   includes=True,
+                                   externals=externals,
+                                   fast_match=fast_match)
+        else:
+            return yara.compile(filepath=rule_filepath,
+                                   includes=True,
+                                   externals=externals,
+                                   fast_match=fast_match)    
+    except yara.YaraSyntaxError as err:
+        print("Failed to load rules with the following error(s):\n%s" % \
+                "\n".join([e for _,_,e in err.errors]), file=sys.stderr)
+        
+        if rule_filepath is None:
+            blacklist = set()
+            for f, _, _ in err.errors:
+                f = os.path.splitext(f[len(rules_rootpath)+1:])[0]
+                blacklist.add(f.replace(os.path.sep, '.'))
+            print("\nYou could blacklist the erroneous rules using:", 
+                    file=sys.stderr)
+            print(" --blacklist=%s" % ",".join(blacklist), file=sys.stderr)
+    return None
+
+
 def main(args):
     try:
         opts, args = getopt(args, 'hw:b:t:o:i:d:r:', ['help', 'version',
@@ -247,6 +281,7 @@ def main(args):
         print("Getopt error: %s" % (exc), file=sys.stderr)
         return -1
 
+    rules_kwargs = {}
     scanner_kwargs = {}
     scanner_kwargs['args'] = args
 
@@ -299,26 +334,26 @@ def main(args):
             if not os.path.exists(arg):
                 print("rule path '%s' does not exist" % arg, file=sys.stderr)
                 return -1
-            scanner_kwargs['rule_filepath'] = arg
+            rules_kwargs['rule_filepath'] = arg
         elif opt in ['-w', '--whitelist']:
-            scanner_kwargs['whitelist'] = arg.split(',')
+            rules_kwargs['whitelist'] = arg.split(',')
         elif opt in ['b', '--blacklist']:
-            scanner_kwargs['blacklist'] = arg.split(',')
+            rules_kwargs['blacklist'] = arg.split(',')
         elif opt in ['--root']:
             if not os.path.exists(arg):
                 print("root path '%s' does not exist" % arg, file=sys.stderr)
                 return -1
-            scanner_kwargs['rules_rootpath'] = os.path.abspath(arg) 
+            rules_kwargs['rules_rootpath'] = os.path.abspath(arg) 
         elif opt in ['-d']:
             try:
-                if 'externals' not in scanner_kwargs:
-                    scanner_kwargs['externals'] = {}
-                scanner_kwargs['externals'].update(eval("dict(%s)" % arg))
+                if 'externals' not in rules_kwargs:
+                    rules_kwargs['externals'] = {}
+                rules_kwargs['externals'].update(eval("dict(%s)" % arg))
             except SyntaxError:
                 print("external '%s' syntax error" % arg, file=sys.stderr)
                 return -1
         elif opt in ['--fast']:
-            scanner_kwargs['fast_match'] = True
+            rules_kwargs['fast_match'] = True
         elif opt in ['--exclude-filesize-lt']:
             try:
                 scanner_kwargs['filesize_lt'] = int(arg)
@@ -416,39 +451,30 @@ def main(args):
                 print("unknown mode %s" % arg, file=sys.stderr)
                 return -1
 
+    #build rules object
+    rules = build_rules(**rules_kwargs)
+    if rules is None:
+        return -1
+
+    #print out configured rules
+    if list_rules == True:
+        print(rules)
+        return 0
+
     #build scanner object
     try:
-        if list_rules == True:
-            scanner_kwargs['execute_pool'] = 0
-            scanner = scan.Scanner(**scanner_kwargs)
-            print(scanner.rules)
-            return 0
-
         print("Building %s" % ScannerClass.__name__, file=sys.stderr)
         for k, v in scanner_kwargs.items():
             if k == 'args': 
                 continue
             print("   %s=%s" % (k, repr(v)), file=sys.stderr)
-        scanner = ScannerClass(**scanner_kwargs)
-    except yara.YaraSyntaxError as err:
-        print("Failed to load rules with the following error(s):\n%s" % \
-                "\n".join([e for _,_,e in err.errors]), file=sys.stderr)
-        
-        if 'rule_filepath' not in scanner_kwargs: 
-            rules_rootpath = scanner_kwargs.get('rules_rootpath', 
-                                                yara.YARA_RULES_ROOT)
-            blacklist = set()
-            for f, _, _ in err.errors:
-                f = os.path.splitext(f[len(rules_rootpath)+1:])[0]
-                blacklist.add(f.replace(os.path.sep, '.'))
-            print("\nYou could blacklist the erroneous rules using:", 
-                    file=sys.stderr)
-            print(" --blacklist=%s" % ",".join(blacklist), file=sys.stderr)
-        return -1
+        scanner = ScannerClass(rules=rules, **scanner_kwargs)
     except Exception as exc:
-        print("Failed to build Scanner with error: %s" % exc, file=sys.stderr)
+        print("Failed to build Scanner with error: %s" % \
+                    traceback.format_exc(), file=sys.stderr)
         return -1
 
+    #run scanner 
     try:
         print("Run scanner", file=sys.stderr)
         for k, v in run_scan_kwargs.items():

@@ -277,7 +277,7 @@ class TestScan(unittest.TestCase):
                     '--recurse-dirs', 
                     '--path-end-exclude=.py,.pyc,.swp',
                     TEST_ROOT)
-        self.assertTrue("scanned: 6" in stderr)
+        self.assertFalse("scanned: 2" in stderr)
         self.assertTrue("matches: 2" in stderr)
 
     def test_path_contains_include(self):

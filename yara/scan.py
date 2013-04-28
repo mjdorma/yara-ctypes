@@ -27,29 +27,31 @@ YARA rules Scanner class definitions
 [mjdorma@gmail.com]
 """
 
+
 EXECUTE_THREAD = 0
 EXECUTE_PROCESS = 1
-
 DEFAULT_EXECUTE_POOL = 4
 DEFAULT_EXECUTE_TYPE = EXECUTE_THREAD
 DEFAULT_STREAM_CHUNK_SIZE = 2**20
 DEFAULT_STREAM_READAHEAD_LIMIT = 2**32
 DEFAULT_STREAM_CHUNK_OVERLAP = 1
+
+
 class Scanner(object):
     enqueuer = None 
 
-    def __init__(self, execute_type=DEFAULT_EXECUTE_TYPE, 
+    def __init__(self, rules=None,
+                       execute_type=DEFAULT_EXECUTE_TYPE, 
                        execute_pool=DEFAULT_EXECUTE_POOL,
                        stream_chunk_size=DEFAULT_STREAM_CHUNK_SIZE,
                        stream_chunk_overlap=DEFAULT_STREAM_CHUNK_OVERLAP,
                        stream_readahead_limit=DEFAULT_STREAM_READAHEAD_LIMIT,
                        stream_chunk_read_max=None,
-                       **rules_kwargs):
+                       **kwargs):
         """Scanner - base Scanner class
 
         kwargs:
             execute_type - type of execution pool 
-
             stream_chunk_size - size in bytes to read from a stream 
             steram_readahead_limit - size in bytes limit for stream read ahead
             stream_chunk_read_max - max number of chunks to read from a stream
@@ -78,8 +80,10 @@ class Scanner(object):
             self.Empty = ProcessEmpty
             self.Execute = Process
         self._execute_type = execute_type
-        self._rules_kwargs = rules_kwargs
-        self._rules = self._create_rules(**self._rules_kwargs)
+        
+        if rules is None:
+            raise ValueError("No rules object passed into __init__")
+        self._rules = rules
         self._chunk_size = stream_chunk_size
         self._chunk_overlap = int((stream_chunk_size * \
                                   stream_chunk_overlap) / 100)
@@ -108,10 +112,6 @@ class Scanner(object):
             t.start()
             self._enqueuer_thread = t
     
-    @property
-    def rules(self):
-        return self._rules
-
     @property
     def sq_size(self):
         """contains the current scan queue size"""
@@ -170,28 +170,7 @@ class Scanner(object):
         they have exhausted the queues up to queue end"""
         self._jq.put(None)
 
-    def _create_rules(self,fast_match=False, 
-                           rules_rootpath=yara.YARA_RULES_ROOT,
-                           whitelist=[],
-                           blacklist=[],
-                           rule_filepath=None,
-                           externals={}, 
-                           **kwargs):
-        if rule_filepath is None:
-            return yara.load_rules(rules_rootpath=rules_rootpath,
-                                      blacklist=blacklist,
-                                      whitelist=whitelist,
-                                      includes=True,
-                                      externals=externals,
-                                      fast_match=fast_match)
-        else:
-            return yara.compile(filepath=rule_filepath,
-                                      includes=True,
-                                      externals=externals,
-                                      fast_match=fast_match)
-
     def _run(self):
-        rules = self._create_rules(**self._rules_kwargs)
         while not self._empty.is_set() and not self.quit.is_set():
             try:
                 job = self._jq.get(timeout=0.1)
@@ -207,7 +186,7 @@ class Scanner(object):
             try:
                 self.scanned += 1
                 f, t, a, k = job
-                f = getattr(rules, f)
+                f = getattr(self._rules, f)
                 r = f(*a, **k)
                 if r:
                     self.matches += 1

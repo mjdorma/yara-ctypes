@@ -1,20 +1,27 @@
 Introduction to yara-ctypes-python
 **********************************
 
-What is yara-ctypes:
+What's in yara-ctypes:
 
-* A powerful python wrapper for `yara-project's libyara v1.7`_.
-* Supports thread safe matching of YARA rules.
+* A ctypes libyara wrapper module which exposes libyara's exports into the
+  Python runtime (see: `yara-project's libyara v1.7`_).
+* A thread safe Rules object with an interface that is compatible with the
+  interface exposed in the yara-project CPython extension module.
 * namespace management to allow easy loading of multiple YARA rules into a
-  single libyara context. 
-* Comes with a scan module which exposes a user CLI and demonstrates a pattern
-  for executing match jobs across a thread pool.
+  single Rules matching object. 
+* Various Scanner class types to enable thread or process pool execution
+  of matching requests over a Rules object.
+* A feature rich command line interface that gives the user many options to
+  control how they may wish to perform a scan.  
 
 
 Why:
 
 * ctypes releases the GIL on system function calls...  Run your PC to its
   true potential.
+* It simplifies things a lot by keeping high order logic such as managing rules
+  paths, filtering paths, controlling pooled execution, etc. inside of a
+  language such as Python.
 * No more building the PyC extension...  
 * I found a few bugs and memory leaks and wanted to make my life simple.
 

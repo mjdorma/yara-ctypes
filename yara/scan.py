@@ -50,23 +50,19 @@ class Scanner(object):
                        **kwargs):
         """Scanner - base Scanner class
 
-        kwargs:
+        rules - rules object we'll be using to match against 
+
+        optional kwargs:
             execute_type - type of execution pool 
+            execute_pool - number of Threads or Process to utilise for pooled
+                           execution
             stream_chunk_size - size in bytes to read from a stream 
+            stream_chunk_overlap - percentage read overlap per chunk 
             steram_readahead_limit - size in bytes limit for stream read ahead
             stream_chunk_read_max - max number of chunks to read from a stream
  
-        rules_kwargs:
-            rules_rootpath - path to the root of the rules directory
-            whitelist - whitelist of rules to use in scanner
-            blacklist - blacklist of rules to not use in scanner
-            rule_filepath=None,
-            execute_pool - number of threads to use in scanner
-            fast_match - scan fast True / False 
-            externals - externally defined variables             
-
         Note: 
-            define an enqueuer function if the enqueue operation will take
+            Define an enqueuer function if the enqueue operation will take
             a long time.  This function is executed asynchronously 
         """
         if execute_type == EXECUTE_THREAD:
@@ -228,7 +224,22 @@ class PathScanner(Scanner):
                 path_end_include=None, path_end_exclude=None, 
                 path_contains_include=None, path_contains_exclude=None, 
                 **scanner_kwargs):
-        """Enqueue paths for scanning"""
+        """Enqueue paths for scanning
+        
+        args - a list of glob'able paths to be scanned
+
+        optional kwargs:
+            recurse_dirs - walk down all directories
+            filesize_gt - exclude files which are greater than 
+            filesize_lt - exclude files which are less than
+            path_end_include - include paths that end with 
+            path_end_exclude - exclude paths that end with
+            path_contains_include - include paths that contain
+            path_contains_exclude - exclude paths that contain
+
+        scanner_kwargs - see Scanner definition for options
+
+        """
         self._paths = []
         for path in args:
             paths = glob(path)
@@ -308,8 +319,13 @@ class PathScanner(Scanner):
 
         
 class PidScanner(Scanner):
-    """Enqueue pids for scanning"""
     def __init__(self, args=[], **scanner_kwargs):
+        """Enqueue pids for scanning
+
+        args - list of process ids to scan
+
+        scanner_kwargs - see Scanner definition for options        
+        """
         Scanner.__init__(self, **scanner_kwargs)
         pids = []
         for pid in args:
@@ -350,8 +366,12 @@ class StdinScanner(Scanner):
 
 
 class SyncScanner(Scanner):
-    """Synchronised matching - take advantage of Scanner synchronously""" 
     def __init__(self, **scanner_kwargs):
+        """Synchronised matching - Use the Scanner's scan pool to process 
+        match jobs synchronously
+
+        scanner_kwargs - see Scanner definition for options
+        """
         self._scan_id = 0
         self._new_results = Event()
         self.enqueuer = self.dequeuer # dequeuing thread

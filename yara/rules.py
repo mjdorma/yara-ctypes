@@ -453,7 +453,7 @@ def compile(filepath=None, source=None, fileobj=None, filepaths=None,
     elif filepaths is not None:
         kwargs['paths'] = filepaths
     else:
-        raise Exception("compile() missing a required argument")
+        raise ValueError("compile() missing a required argument")
 
     rules = Rules(**kwargs)
     c = rules.context

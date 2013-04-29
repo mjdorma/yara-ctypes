@@ -94,6 +94,7 @@ class Scanner(object):
         self._scanned = Value('l', 0)
         self._matches = Value('l', 0)
         self._errors = Value('l', 0)
+        self._alive = Value('l', execute_pool)
         self.quit = self.Event()
         atexit.register(self.quit.set)
 
@@ -112,15 +113,6 @@ class Scanner(object):
     
         for p in self._pool:
             p.start()
-
-    def _enqueuer(self):
-        try:
-            self.enqueuer()
-        except:
-            print("Error in enqueuer: %s" % traceback.format_exc(),
-                    file=sys.stderr)
-        finally:
-            self._enqueuer_complete.set()
 
     @property
     def scanned(self):
@@ -192,6 +184,16 @@ class Scanner(object):
         they have exhausted the queues up to queue end"""
         self._jq.put(None)
 
+    def _enqueuer(self):
+        try:
+            self.enqueuer()
+        except:
+            print("Error in enqueuer: %s" % traceback.format_exc(),
+                    file=sys.stderr)
+        finally:
+            self.enqueue_end()
+            self._enqueuer_complete.set()
+
     def _run(self):
         try:
             while not self._empty.is_set() and not self.quit.is_set():
@@ -203,8 +205,11 @@ class Scanner(object):
                     self._enqueuer_complete.wait()
                     self._jq.task_done()
                     self._jq.join()
-                    self._rq.put(None)
+                    #wait until this is the only worker left
                     self._empty.set()
+                    while self.alive > 1:
+                        time.sleep(0.1)
+                    self._rq.put(None)
                     break
                 try:
                     self._scanned.value += 1
@@ -221,10 +226,16 @@ class Scanner(object):
                     self._jq.task_done()
         except Exception:
             print(traceback.format_exc(), file=sys.__stderr__)
-
+        finally:
+            self._alive.value -= 1
+        
     def join(self, timeout=None):
         for t in self._pool:
             t.join(timeout=timeout)
+
+    @property
+    def alive(self):
+        return self._alive.value
 
     def is_alive(self):
         for t in self._pool:
@@ -238,15 +249,10 @@ class Scanner(object):
         return r
 
     def __iter__(self):
-        # The JoinableQueue does not behaviour the same as a normal Queue
-        # need to do this while hack to ensure result queue and scan queues 
-        # are zero
-        while not self._empty.is_set() or \
-                (self.sq_size + self.rq_size) > 0:
+        while True:
             r = self.dequeue()
             if r is None:
-                self.join() #part of the while hack... ensure end of execution
-                continue 
+                break
             yield r
         
 
@@ -290,7 +296,6 @@ class PathScanner(Scanner):
     def enqueuer(self):
         for path in self.paths:
             self.enqueue_path(path, path)
-        self.enqueue_end()
 
     def exclude_path(self, path):
         def do_test(pathtest, tests):
@@ -358,7 +363,6 @@ class PidScanner(Scanner):
 
         scanner_kwargs - see Scanner definition for options        
         """
-        Scanner.__init__(self, **scanner_kwargs)
         pids = []
         for pid in args:
             try:
@@ -367,10 +371,12 @@ class PidScanner(Scanner):
                 pids.append(pid)
             except ValueError:
                 raise ValueError("PID %s was not an int" % (pid))
+        self._pids = pids
+        Scanner.__init__(self, **scanner_kwargs)
 
-        for pid in pids:
+    def enqueuer(self):
+        for pid in self._pids:
             self.enqueue_proc("%s"%pid, pid)
-        self.enqueue_end()
 
 
 class FileChunkScanner(PathScanner):
@@ -384,7 +390,6 @@ class FileChunkScanner(PathScanner):
                 print("Failed to enqueue %s - %s" % (path,
                                 traceback.format_exc()), 
                             file=sys.stderr)
-        self.enqueue_end()
 
 
 class StdinScanner(Scanner):
@@ -394,7 +399,6 @@ class StdinScanner(Scanner):
             self.enqueue_stream(sys.stdin)
         except Exception as exc:
             print("Error reading stream - %s" % (exc), file=sys.stderr)
-        self.enqueue_end()
 
 
 class SyncScanner(Scanner):

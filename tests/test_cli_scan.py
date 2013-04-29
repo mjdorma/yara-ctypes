@@ -99,8 +99,6 @@ class TestScan(unittest.TestCase):
 
     def test_simple(self):
         ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', BIRD_YAR)
-        print(stdout)
-        print(stderr)
         self.assertEqual(ret, 0)
         self.assertTrue("meta.yar: main.Bird01" in stdout)
 
@@ -301,8 +299,10 @@ class TestScan(unittest.TestCase):
                     '--recurse-dirs', 
                     '--path-contains-exclude=bird',
                     RULES_ROOT)
-        self.assertTrue("scanned: 5" in stderr)
+        print(stdout)
+        print(stderr)
         self.assertTrue("matches: 1" in stderr)
+        self.assertTrue("scanned: 5" in stderr)
 
     def test_filesize_lt(self):
         ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', 

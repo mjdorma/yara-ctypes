@@ -99,6 +99,8 @@ class TestScan(unittest.TestCase):
 
     def test_simple(self):
         ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', BIRD_YAR)
+        print(stdout)
+        print(stderr)
         self.assertEqual(ret, 0)
         self.assertTrue("meta.yar: main.Bird01" in stdout)
 

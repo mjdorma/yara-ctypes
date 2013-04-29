@@ -208,11 +208,12 @@ def run_scanner(scanner,
                     print("<scan arg='%s'>" % arg, file=out_stream)
                     print(formatted_res, file=out_stream)
                     print("</scan>", file=out_stream)
-                    out_stream.flush()
+                out_stream.flush()
             else:
                 if err_stream is not None:
                     print("<scan arg='%s'>%s</scan>" % (arg, res),
                                                         file=err_stream)
+                    err_stream.flush()
     finally:
         print_status(scanner)
         sys.stderr.write("\nwaiting scanner ... ")
@@ -261,7 +262,7 @@ def main(args):
         opts, args = getopt(args, 'hw:b:t:o:i:d:r:', ['help', 'version',
             'list',
             'mode=',
-            'execute-pool=', 'execute-mode=', 
+            'execute-pool=', 'execute-type=', 
             'rule=',
             'root=',
             'whitelist=',
@@ -418,13 +419,13 @@ def main(args):
             except ValueError:
                 print("param '%s' was not an int" % (arg), file=sys.stderr)
                 return -1
-        elif opt in ['--execute-mode']:
+        elif opt in ['--execute-type']:
             if arg == 'thread':
-                scanner_kwargs['execute_mode'] = scan.EXECUTE_THREAD
+                scanner_kwargs['execute_type'] = scan.EXECUTE_THREAD
             elif arg == 'process':
-                scanner_kwargs['execute_mode'] = scan.EXECUTE_PROCESS
+                scanner_kwargs['execute_type'] = scan.EXECUTE_PROCESS
             else:
-                print("unknown execute mode '%s'" % arg)
+                print("unknown execute type '%s'" % arg)
                 return -1
         elif opt in ['--execute-pool']:
             try:

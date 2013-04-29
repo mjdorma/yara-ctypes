@@ -1,5 +1,7 @@
+from __future__ import print_function
 import sys
 import os
+import traceback
 if sys.version_info[0] < 3:
     from StringIO import StringIO
 else:
@@ -21,6 +23,8 @@ def run_main(*args):
         try:
             ret = cli.main(args)
         finally:
+            sys.stdout.flush()
+            sys.stderr.flush()
             sys.stdout.seek(0)
             sys.stderr.seek(0)
             stdout = sys.stdout.read().strip()
@@ -28,6 +32,8 @@ def run_main(*args):
             sys.stdout = sys.__stdout__
             sys.stderr = sys.__stderr__
     except Exception as exc:
+        print("stdout:\n%s\nstderr:\n%s\ntraceback:\n%s" % (stdout,
+            stderr, traceback.format_exc()), file=sys.stderr)
         exc.stdout = stdout
         exc.stderr = stderr
         raise 
@@ -330,7 +336,7 @@ class TestScan(unittest.TestCase):
 class TestScanProcessPool(TestScan):
     def _run_main(self, *a):
         a = list(a)
-        a.insert(0, '--execute-mode=process')
+        a.insert(0, '--execute-type=process')
         return self._orig_main(*a)
 
     def setUp(self):

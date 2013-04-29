@@ -12,8 +12,9 @@ else:
     from queue import Queue as ThreadQueue
     from queue import Empty as ThreadEmpty
 from multiprocessing import Process
+from multiprocessing import Value 
 from multiprocessing import Event as ProcessEvent
-from multiprocessing.queues import Queue as ProcessQueue
+from multiprocessing.queues import JoinableQueue as ProcessQueue
 from multiprocessing.queues import Empty as ProcessEmpty
 
 import time
@@ -90,23 +91,48 @@ class Scanner(object):
         self._rq = self.Queue()
         self._empty = self.Event()
         self._pool = []
-        self.scanned = 0
-        self.matches = 0
-        self.errors = 0
+        self._scanned = Value('l', 0)
+        self._matches = Value('l', 0)
+        self._errors = Value('l', 0)
         self.quit = self.Event()
         atexit.register(self.quit.set)
+
+        self._enqueuer_complete = self.Event()
+        if self.enqueuer is not None:
+            t = Thread(target=self._enqueuer)
+            t.daemon = True
+            t.start()
+        else:
+            self._enqueuer_complete.set()
 
         for i in range(execute_pool):
             t = self.Execute(target=self._run)
             t.daemon = True
-            t.start()
             self._pool.append(t)
-        
-        if self.enqueuer is not None:
-            t = Thread(target=self.enqueuer)
-            t.daemon = True
-            t.start()
-            self._enqueuer_thread = t
+    
+        for p in self._pool:
+            p.start()
+
+    def _enqueuer(self):
+        try:
+            self.enqueuer()
+        except:
+            print("Error in enqueuer: %s" % traceback.format_exc(),
+                    file=sys.stderr)
+        finally:
+            self._enqueuer_complete.set()
+
+    @property
+    def scanned(self):
+        return self._scanned.value
+
+    @property
+    def matches(self):
+        return self._matches.value
+
+    @property
+    def errors(self):
+        return self._errors.value
     
     @property
     def sq_size(self):
@@ -167,32 +193,34 @@ class Scanner(object):
         self._jq.put(None)
 
     def _run(self):
-        while not self._empty.is_set() and not self.quit.is_set():
-            try:
-                job = self._jq.get(timeout=0.1)
-            except self.Empty:
-                continue
-            if job is None:
-                if self._execute_type == EXECUTE_THREAD:
+        try:
+            while not self._empty.is_set() and not self.quit.is_set():
+                try:
+                    job = self._jq.get(timeout=0.1)
+                except self.Empty:
+                    continue
+                if job is None:
+                    self._enqueuer_complete.wait()
                     self._jq.task_done()
-                self._jq.join()
-                self._rq.put(None)
-                self._empty.set()
-                break
-            try:
-                self.scanned += 1
-                f, t, a, k = job
-                f = getattr(self._rules, f)
-                r = f(*a, **k)
-                if r:
-                    self.matches += 1
-            except Exception:
-                self.errors += 1
-                r = traceback.format_exc()
-            finally:
-                self._rq.put((t, r))
-                if self._execute_type == EXECUTE_THREAD:
+                    self._jq.join()
+                    self._rq.put(None)
+                    self._empty.set()
+                    break
+                try:
+                    self._scanned.value += 1
+                    f, t, a, k = job
+                    f = getattr(self._rules, f)
+                    r = f(*a, **k)
+                    if r:
+                        self._matches.value += 1
+                except Exception:
+                    self._errors.value += 1
+                    r = traceback.format_exc()
+                finally:
+                    self._rq.put((t, r))
                     self._jq.task_done()
+        except Exception:
+            print(traceback.format_exc(), file=sys.__stderr__)
 
     def join(self, timeout=None):
         for t in self._pool:
@@ -204,17 +232,21 @@ class Scanner(object):
                 return True
         return False
 
-    def dequeue(self):
-        r = self._rq.get()
-        if self._execute_type == EXECUTE_THREAD:
-            self._rq.task_done()
+    def dequeue(self, timeout=None):
+        r = self._rq.get(timeout=timeout)
+        self._rq.task_done()
         return r
 
     def __iter__(self):
-        while True:
+        # The JoinableQueue does not behaviour the same as a normal Queue
+        # need to do this while hack to ensure result queue and scan queues 
+        # are zero
+        while not self._empty.is_set() or \
+                (self.sq_size + self.rq_size) > 0:
             r = self.dequeue()
             if r is None:
-                break
+                self.join() #part of the while hack... ensure end of execution
+                continue 
             yield r
         
 

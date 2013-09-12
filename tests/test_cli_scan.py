@@ -136,7 +136,8 @@ class TestScan(unittest.TestCase):
                             '--chunk-size=10', '--mode=chunk',
                             '--chunk-overlap=0',
                             BIRD_YAR)
-        self.assertTrue("meta.yar[150:160]" in stdout)
+        self.assertTrue("meta.yar[150:160]" in stdout,
+                msg="meta.yar[150:160] not in \nso=%s\nse=%s" % (stdout, stderr))
         self.assertEqual(ret, 0)
 
         ret, stdout, stderr = run_main('--chunk-size=a')
@@ -149,7 +150,7 @@ class TestScan(unittest.TestCase):
                             '--chunk-overlap=0',
                             '--readahead-limit=20', BIRD_YAR)
         self.assertTrue("meta.yar[150:160]" in stdout,
-                msg="meta.yar[150:160] not in \n%s\n%s" % (stdout, stderr))
+                msg="meta.yar[150:160] not in \nso=%s\nse=%s" % (stdout, stderr))
         self.assertEqual(ret, 0)
 
         ret, stdout, stderr = run_main('--readahead-limit=a')
@@ -162,7 +163,8 @@ class TestScan(unittest.TestCase):
                             '--readahead-limit=20', 
                             '--chunk-overlap=0', '--simple',
                             BIRD_YAR)
-        self.assertTrue("meta.yar[150:160]" in stdout)
+        self.assertTrue("meta.yar[150:160]" in stdout,
+                msg="meta.yar[150:160] not in \nso=%s\nse=%s" % (stdout, stderr))
         self.assertEqual(ret, 0)
 
         ret, stdout, stderr = run_main('-r', BIRD_YAR, 
@@ -170,8 +172,12 @@ class TestScan(unittest.TestCase):
                             '--readahead-limit=20', 
                             '--chunk-overlap=50', '--simple',
                             BIRD_YAR)
-        self.assertTrue("meta.yar[136:160]: main.Bird01" in stdout)
-        self.assertTrue("meta.yar[40:64]: main.Bird01" in stdout)
+        self.assertTrue("meta.yar[136:160]: main.Bird01" in stdout,
+                msg="meta.yar[136:160]: main.Bird01 not in \nso=%s\nse=%s" % \
+                        (stdout, stderr))
+        self.assertTrue("meta.yar[40:64]: main.Bird01" in stdout,
+                msg="meta.yar[40:64]: main.Bird01 not in \nso=%s\nse=%s" % (stdout,
+                        stderr))
         self.assertEqual(ret, 0)
         
         ret, stdout, stderr = run_main('--chunk-overlap=a')
@@ -227,7 +233,9 @@ class TestScan(unittest.TestCase):
         ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', RULES_ROOT)
         self.assertEqual(ret, 0)
         #self.assertEqual(len(stdout.splitlines()), 1)
-        self.assertTrue("meta.yar: main.Bird01" in stdout)
+        self.assertTrue("meta.yar: main.Bird01" in stdout,
+                msg="meta.yar: main.Bird01 not in \nso=%s\nse=%s" % (stdout,
+                    stderr))
 
         ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', 
                     '--recurse-dirs', RULES_ROOT)
@@ -291,7 +299,7 @@ class TestScan(unittest.TestCase):
                     RULES_ROOT)
         self.assertTrue("scanned: 2" in stderr)
         self.assertTrue("matches: 2" in stderr,
-                msg="matches: 2 not in \n%s\n%s" % (stdout, stderr))
+                msg="matches: 2 not in \nso=%s\nse=%s" % (stdout, stderr))
 
         ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', 
                     '--recurse-dirs', 
@@ -306,7 +314,7 @@ class TestScan(unittest.TestCase):
                     '--path-end-exclude=.py,.pyc,.swp',
                     TEST_ROOT)
         self.assertTrue("scanned: 6" in stderr,
-                    msg = "scanned: 6 not in \n%s\n%s" % (stdout, stderr))
+                    msg = "scanned: 6 not in \nso=%s\nse=%s" % (stdout, stderr))
         self.assertTrue("matches: 2" in stderr)
 
     def test_path_contains_include(self):

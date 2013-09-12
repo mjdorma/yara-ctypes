@@ -102,6 +102,11 @@ with GitHub's issues system.
 Change log
 ==========
 
+version 1.7.5 (13/09/2013)
+
+* added CLI status thread
+* improved process and thread completion code
+
 version 1.7.4 (12/09/2013)
 
 * added yar preprocessor 

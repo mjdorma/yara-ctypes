@@ -222,7 +222,6 @@ class Scanner(object):
                     self._enqueuer_complete.wait()
                     self._jq.task_done()
                     self._jq.join()
-                    #wait until this is the only worker left
                     self._empty.set()
                     self._rq.put(None)
                     break
@@ -261,6 +260,10 @@ class Scanner(object):
         while True:
             r = self.dequeue()
             if r is None:
+                # Wait until the workers are complete then purge the queue
+                self.join()
+                for i in range(self._rq.qsize()):
+                    yield self.dequeue()
                 break
             yield r
         
@@ -304,7 +307,6 @@ class PathScanner(Scanner):
 
     def enqueuer(self):
         for path in self.paths:
-            print(path)
             self.enqueue_path(path, path)
 
     def exclude_path(self, path):

@@ -102,6 +102,12 @@ with GitHub's issues system.
 Change log
 ==========
 
+version 1.7.4 (12/09/2013)
+
+* added yar preprocessor 
+* fixed asynchronous counter bug
+* solved the unyielded results issue
+
 version 1.7.3 (28/04/2013)
 
 * scan using a process pool or thread pool

@@ -1,9 +1,3 @@
-import sys
-import os
-
-import ctypes
-from ctypes import *
-
 """
 A ctypes wrapper to libyara.dll or libyara.so version 1.6
 
@@ -12,6 +6,12 @@ Note: read the ctypes wrapper README to see details on how to extend
 
 [mjdorma@gmail.com]
 """
+import sys
+import os
+
+import ctypes
+from ctypes import *
+
 
 #define yara.h
 

@@ -1,3 +1,9 @@
+"""Compiles a YARA rules files into a thread safe Rules object ready for
+matching.
+
+[mjdorma@gmail.com]
+"""
+
 import sys
 import os
 import pprint
@@ -10,11 +16,6 @@ from io import BytesIO
 from yara.preprocessor import preprocess
 from yara.libyara_wrapper import *
 
-"""Compiles a YARA rules files into a thread safe Rules object ready for
-matching.
-
-[mjdorma@gmail.com]
-"""
 
 CALLBACK_CONTINUE = 0
 CALLBACK_ABORT = 1

@@ -1,3 +1,9 @@
+"""
+YARA rules Scanner class definitions 
+
+[mjdorma@gmail.com]
+"""
+
 from __future__ import print_function
 import sys
 import os
@@ -23,12 +29,6 @@ import time
 import atexit
 
 import yara
-
-"""
-YARA rules Scanner class definitions 
-
-[mjdorma@gmail.com]
-"""
 
 
 EXECUTE_THREAD = 0

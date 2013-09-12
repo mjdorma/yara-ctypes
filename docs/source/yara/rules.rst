@@ -15,6 +15,7 @@ Features:
     * Provides a thread safe yara context manager.
     * Detailed control over the loading of multiple YARA rules files into a
     * single context.
+    * A C-like preprocessor for yar files.  Allows for #ifdef #ifndef etc.
 
 Key differences to yara-python.c:
     * Results returned from a ``Rules.match(_??)`` function are stored in a

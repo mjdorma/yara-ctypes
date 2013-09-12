@@ -4,6 +4,7 @@ python:
   - 2.7
   - 3.2
   - 3.3
+  - pypi
 install:
   - sudo rm -rf /dev/shm && sudo ln -s /run/shm /dev/shm
   - python setup.py install 

@@ -28,8 +28,8 @@ def _evaluate(expr, defines):
     """
     try:
         rv = eval(expr, {'defined':lambda v: v in defines}, defines)
-    except Exception, ex:
-        msg = str(ex)
+    except Exception as exc:
+        msg = str(exc)
         if msg.startswith("name '") and msg.endswith("' is not defined"):
             varName = msg[len("name '"):-len("' is not defined")]
             if expr.find("defined(%s)" % varName) != -1:
@@ -103,8 +103,6 @@ def _process(infile, output, defines, include_paths, paths):
                             val = eval(val, {}, {})
                         except:
                             pass
-                    print(line)
-                    print("*"*20, var, val)
                     defines[var] = val
             elif op == "undef":
                 if not (states and states[-1].state == SKIP):

@@ -165,7 +165,7 @@ def match_filter(tags_filter, idents_filter, res):
 
 
 STATUS = "\
-scanned: %-8s matches: %-4s errors: %-4s scan queue: %-8s res queue: %-7s" 
+scanned:%-8s matches:%-4s errors:%-4s scan queue:%-8s res queue:%-7s %s" 
 
 class Status(object):
     def __init__(self, scanner):
@@ -175,6 +175,7 @@ class Status(object):
         self._pause = False
         self._thread = Thread(target=self._writer)
         self._thread.start()
+        self._ticker = 0
 
     def quit(self):
         self._quit = True
@@ -204,8 +205,10 @@ class Status(object):
         sys.stderr.write("\b" * len(self.status))
 
     def print_status(self):
+        self._ticker -= 1
+        t = ['\\', '-', '/', '|'][self._ticker % 4]
         self.status = STATUS % (self.scanner.scanned, self.scanner.matches, 
-                self.scanner.errors, self.scanner.sq_size, self.scanner.rq_size)
+            self.scanner.errors, self.scanner.sq_size, self.scanner.rq_size, t)
         self.clear_status()
         sys.stderr.write(self.status)
 

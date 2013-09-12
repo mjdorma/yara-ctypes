@@ -286,10 +286,7 @@ def main(args):
     scanner_kwargs = {}
     scanner_kwargs['args'] = args
 
-    if not args and sys.stdin.isatty():
-        ScannerClass = scan.StdinScanner
-    else:
-        ScannerClass = scan.PathScanner
+    ScannerClass = scan.PathScanner
 
     list_rules = False
     run_scan_kwargs = {}

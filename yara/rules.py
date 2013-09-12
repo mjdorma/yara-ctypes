@@ -5,7 +5,9 @@ import types
 import copy
 import traceback
 import threading
+from io import BytesIO 
 
+from yara.preprocessor import preprocess
 from yara.libyara_wrapper import *
 
 """Compiles a YARA rules files into a thread safe Rules object ready for
@@ -29,7 +31,7 @@ class RuleContext():
     control over libyara's matching execution.  This class is responsible
     for the conversion of libyara results to python results.
     """
-    def __init__(self, strings, includes, externals, fast_match):
+    def __init__(self, strings, externals, fast_match):
         """See doc for Rules()"""
         self._callback_error = None
         self._callback = YARACALLBACK(self._callback)
@@ -42,7 +44,7 @@ class RuleContext():
                                     self._error_report_function
 
         self._process_externals(externals)
-        self._context.contents.allow_includes = includes
+        self._context.contents.allow_includes = True 
         self._context.contents.fast_match = fast_match
 
         for namespace, filename, string in strings:
@@ -191,20 +193,20 @@ class Rules():
     exposes libyara's match capability.
     """
     def __init__(self, paths={},
-                 rules_rootpath=None,
+                 defines={},
+                 include_path=[],
                  strings=[],
-                 includes=True,
                  externals={},
                  fast_match=False):
         """Defines a new yara context with specified yara sigs
 
         Options:
             paths          - {namespace:rules_path,...}
-            rules_rootpath - root of the rules files. Define this to change
-                             curdir before compiling the yara rules files.
+            include_path  - a list of paths to search for given #include
+                             directives. 
+            defines        - key:value defines for the preprocessor.  Sub in 
+                             strings or macros defined in your rules files.
             strings        - [(namespace, filename, rules_string),...]
-            includes       - allow YARA files to include other YARA files
-                             (default True)
             externals      - define boolean, integer, or string variables
                              {var:val,...}
             fast_match     - enable fast matching in the YARA context
@@ -216,17 +218,13 @@ class Rules():
             rules_string - the text read from a .yar file
         """
         self._strings = copy.copy(strings)
-        self._rules_rootpath = rules_rootpath
         self.namespaces = set()
         self._contexts = {}
-        self._new_context_lock = threading.Lock()
         for namespace, path in paths.items():
             self.namespaces.add(namespace)
-            with open(path, 'rb') as f:
-                self._strings.append((namespace, path, f.read()))
-
+            string = preprocess(path, defines, include_path)
+            self._strings.append((namespace, path, string))
         self._context_args = [self._strings,
-                                  includes,
                                   externals,
                                   fast_match]
 
@@ -238,15 +236,7 @@ class Rules():
         ident = threading.current_thread().ident
         c = self._contexts.get(ident, None)
         if c is None:
-            with self._new_context_lock:
-                if self._rules_rootpath is not None:
-                    pushdir = os.path.abspath(os.path.curdir)
-                    os.chdir(self._rules_rootpath)
-                try:
-                    c = RuleContext(*self._context_args)
-                finally:
-                    if self._rules_rootpath is not None:
-                        os.chdir(pushdir)
+                c = RuleContext(*self._context_args)
                 self._contexts[ident] = c
         return c
 
@@ -369,11 +359,13 @@ class Rules():
 
 YARA_RULES_ROOT = os.environ.get('YARA_RULES',
                     os.path.join(os.path.dirname(__file__), 'rules'))
+INCLUDE_PATH = os.environ.get('PATH','.').split(':')
 
 
 def load_rules(rules_rootpath=YARA_RULES_ROOT,
                blacklist=[],
                whitelist=[],
+               include_path=INCLUDE_PATH,
                **rules_kwargs):
     """A simple way to build a complex yara Rules object with strings equal to
     [(namespace:filepath:source),...]
@@ -398,7 +390,6 @@ def load_rules(rules_rootpath=YARA_RULES_ROOT,
        whitelist - namespaces "starting with" to include
 
     Rule options:
-        includes - allow YARA files to include other YARA files (default True)
         externals - define boolean, integer, or string variables {var:val,...}
         fast_match - enable fast matching in the YARA context
     """
@@ -430,7 +421,9 @@ def load_rules(rules_rootpath=YARA_RULES_ROOT,
 
             paths[namespace] = os.path.join(path, filename)
 
-    rules = Rules(paths=paths, rules_rootpath=rules_rootpath, **rules_kwargs)
+    include_path = copy.copy(include_path)
+    include_path.append(rules_rootpath)
+    rules = Rules(paths=paths, include_path=include_path, **rules_kwargs)
     c = rules.context
     rules.free()
     return rules
@@ -448,7 +441,6 @@ def compile(filepath=None, source=None, fileobj=None, filepaths=None,
         sources - {namespace:source_str,...}
 
     Rule options:
-        includes - allow YARA files to include other YARA files (default True)
         externals - define boolean, integer, or string variables {var:val,...}
         fast_match - enable fast matching in the YARA context
 

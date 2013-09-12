@@ -19,8 +19,8 @@ class TestRulesMemoryLeakHunt(unittest.TestCase):
         """memory - create multi scan than destroy"""
         sm = yr_malloc_count()
         sf = yr_free_count()
-        rules = yara.load_rules(RULES_ROOT, includes=True, 
-                blacklist=['broken', 'extern'])
+        rules = yara.load_rules(RULES_ROOT,  
+                                blacklist=['broken', 'extern'])
         for i in range(100):
             matches = rules.match_path(sys.executable)
         rules.free()
@@ -35,8 +35,8 @@ class TestRulesMemoryLeakHunt(unittest.TestCase):
         sm = yr_malloc_count()
         sf = yr_free_count()
         for i in range(100):
-            rules = yara.load_rules(RULES_ROOT, includes=True, 
-                blacklist=['broken', 'extern'])
+            rules = yara.load_rules(RULES_ROOT,  
+                                    blacklist=['broken', 'extern'])
             rules.free()
         dsm = yr_malloc_count()
         dsf = yr_free_count()
@@ -47,8 +47,8 @@ class TestRulesMemoryLeakHunt(unittest.TestCase):
         sm = yr_malloc_count()
         sf = yr_free_count()
         for i in range(10):
-            rules = yara.load_rules(RULES_ROOT, includes=True, 
-                blacklist=['broken', 'extern'])
+            rules = yara.load_rules(RULES_ROOT,  
+                                    blacklist=['broken', 'extern'])
             matches = rules.match_path(sys.executable)
             rules.free()
         dsm = yr_malloc_count()
@@ -66,8 +66,8 @@ class TestRulesMemoryLeakHunt(unittest.TestCase):
         sf = yr_free_count()
         for i in range(5):
             #spool up 4 threads
-            rules = yara.load_rules(RULES_ROOT, includes=True, 
-                blacklist=['broken', 'extern'])
+            rules = yara.load_rules(RULES_ROOT,  
+                                    blacklist=['broken', 'extern'])
             target = sys.executable
             tl = []
             for i in range(4):

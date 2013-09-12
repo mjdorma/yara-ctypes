@@ -1,3 +1,10 @@
+"""
+Scanner command line interface.
+
+
+[mjdorma@gmail.com]
+"""
+
 from __future__ import print_function
 import sys
 import os
@@ -11,13 +18,6 @@ import time
 
 import yara
 from yara import scan
-
-
-"""
-Scanner command line interface.
-
-[mjdorma@gmail.com]
-"""
 
 
 __help__ = """
@@ -84,6 +84,9 @@ Rules control:
     -d <identifier>=<value>
         define external variable.
 
+    --defines=<identifier>=<value>
+        define the preprocessor environment.  
+
   namespace: 
     --list
         list available YARA namespaces
@@ -96,6 +99,10 @@ Rules control:
 
     --root=(env[YARA_RULES] or <pkg>/yara/rules/)
         set the YARA_RULES path (path to the root of the rules directory)
+
+    --include_paths=(env[PATH]) or define path1,path2,...
+        Set the paths used to find #include files.  When a yara file path
+        search each of this directory paths for a matching file path.
   
   yarafile:
     -r, --rule=
@@ -219,6 +226,8 @@ def run_scanner(scanner,
         sys.stderr.write("\nwaiting scanner ... ")
         scanner.quit.set() 
         scanner.join()
+        sys.stdout.flush()
+        sys.stderr.flush()
         print("scan completed after %0.02fs." % (time.time()-stime), 
                 file=sys.stderr)
 
@@ -227,6 +236,7 @@ def build_rules(fast_match=False,
                    rules_rootpath=yara.YARA_RULES_ROOT,
                    whitelist=[],
                    blacklist=[],
+                   include_path=yara.INCLUDE_PATH,
                    rule_filepath=None,
                    externals={}):
     try:
@@ -234,14 +244,14 @@ def build_rules(fast_match=False,
             return yara.load_rules(rules_rootpath=rules_rootpath,
                                    blacklist=blacklist,
                                    whitelist=whitelist,
-                                   includes=True,
+                                   include_path=include_path,
                                    externals=externals,
                                    fast_match=fast_match)
         else:
             return yara.compile(filepath=rule_filepath,
-                                   includes=True,
                                    externals=externals,
-                                   fast_match=fast_match)    
+                                   fast_match=fast_match,
+                                   include_path=include_path)    
     except yara.YaraSyntaxError as err:
         print("Failed to load rules with the following error(s):\n%s" % \
                 "\n".join([e for _,_,e in err.errors]), file=sys.stderr)
@@ -265,9 +275,11 @@ def main(args):
             'execute-pool=', 'execute-type=', 
             'rule=',
             'root=',
+            'include_paths=',
             'whitelist=',
             'blacklist=',
             'fast',
+            'defines=',
             'fmt=',
             'simple',
             'error-log=',
@@ -342,6 +354,8 @@ def main(args):
                 print("root path '%s' does not exist" % arg, file=sys.stderr)
                 return -1
             rules_kwargs['rules_rootpath'] = os.path.abspath(arg) 
+        elif opt in ['--include_paths']:
+            rules_kwargs['include_paths'] = args.split(',')
         elif opt in ['-d']:
             try:
                 if 'externals' not in rules_kwargs:
@@ -352,6 +366,14 @@ def main(args):
                 return -1
         elif opt in ['--fast']:
             rules_kwargs['fast_match'] = True
+        elif opt in ['--defines']:
+            try:
+                if 'defines' not in rules_kwargs:
+                    rules_kwargs['defines'] = {}
+                rules_kwargs['defines'].update(eval("dict(%s)" % arg))
+            except SyntaxError:
+                print("external '%s' syntax error" % arg, file=sys.stderr)
+                return -1
         elif opt in ['--exclude-filesize-lt']:
             try:
                 scanner_kwargs['filesize_lt'] = int(arg)

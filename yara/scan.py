@@ -94,7 +94,6 @@ class Scanner(object):
         self._scanned = Value('l', 0)
         self._matches = Value('l', 0)
         self._errors = Value('l', 0)
-        self._alive = Value('l', execute_pool)
         self.quit = self.Event()
         atexit.register(self.quit.set)
 
@@ -207,8 +206,6 @@ class Scanner(object):
                     self._jq.join()
                     #wait until this is the only worker left
                     self._empty.set()
-                    while self.alive > 1:
-                        time.sleep(0.1)
                     self._rq.put(None)
                     break
                 try:
@@ -226,16 +223,10 @@ class Scanner(object):
                     self._jq.task_done()
         except Exception:
             print(traceback.format_exc(), file=sys.__stderr__)
-        finally:
-            self._alive.value -= 1
         
     def join(self, timeout=None):
         for t in self._pool:
             t.join(timeout=timeout)
-
-    @property
-    def alive(self):
-        return self._alive.value
 
     def is_alive(self):
         for t in self._pool:
@@ -295,6 +286,7 @@ class PathScanner(Scanner):
 
     def enqueuer(self):
         for path in self.paths:
+            print(path)
             self.enqueue_path(path, path)
 
     def exclude_path(self, path):

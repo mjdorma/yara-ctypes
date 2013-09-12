@@ -15,6 +15,8 @@ import pickle
 import traceback
 import marshal
 import time
+from threading import Thread
+from threading import Event 
 
 import yara
 from yara import scan
@@ -164,15 +166,48 @@ def match_filter(tags_filter, idents_filter, res):
 
 STATUS = "\
 scanned: %-8s matches: %-4s errors: %-4s scan queue: %-8s res queue: %-7s" 
-def clear_status(scanner):
-    status = STATUS % (scanner.scanned, scanner.matches, 
-                            scanner.errors, scanner.sq_size, scanner.rq_size)
-    sys.stderr.write("\b" * len(status))
 
-def print_status(scanner):
-    status = STATUS % (scanner.scanned, scanner.matches, 
-                            scanner.errors, scanner.sq_size, scanner.rq_size)
-    sys.stderr.write("\b" * len(status) + status)
+class Status(object):
+    def __init__(self, scanner):
+        self.scanner = scanner
+        self._quit = False
+        self._pause_window = Event()
+        self._pause = False
+        self._thread = Thread(target=self._writer)
+        self._thread.start()
+
+    def quit(self):
+        self._quit = True
+        self._thread.join()
+
+    def pause(self):
+        self._pause_window.wait()
+        self._pause = True
+
+    def resume(self):
+        self._pause = False
+
+    def _writer(self):
+        acc = 0
+        while self._quit is False:
+            self._pause_window.set()
+            time.sleep(0.1)
+            acc += 1
+            if acc % 5 != 0:
+                continue
+            self._pause_window.clear()
+            if self._pause:
+                continue
+            self.print_status()
+
+    def clear_status(self):
+        sys.stderr.write("\b" * len(self.status))
+
+    def print_status(self):
+        self.status = STATUS % (self.scanner.scanned, self.scanner.matches, 
+                self.scanner.errors, self.scanner.sq_size, self.scanner.rq_size)
+        self.clear_status()
+        sys.stderr.write(self.status)
 
 
 def run_scanner(scanner, 
@@ -186,15 +221,17 @@ def run_scanner(scanner,
     if out_stream is None:
         out_stream = sys.stdout
     stime = time.time()
+    status = Status(scanner)
+    status.print_status()
     try:
         for arg, res in scanner:
-            print_status(scanner)
             if not res:
                 continue   
 
             if type(res) is dict:
                 if out_stream == sys.stdout:
-                    clear_status(scanner)
+                    status.pause()
+                    status.clear_status()
                 res = match_filter(tags_filter, idents_filter, res)
                 if not res:
                     continue 
@@ -216,13 +253,16 @@ def run_scanner(scanner,
                     print(formatted_res, file=out_stream)
                     print("</scan>", file=out_stream)
                 out_stream.flush()
+                if out_stream == sys.stdout:
+                    status.resume()
             else:
                 if err_stream is not None:
                     print("<scan arg='%s'>%s</scan>" % (arg, res),
                                                         file=err_stream)
                     err_stream.flush()
     finally:
-        print_status(scanner)
+        status.quit()
+        status.print_status()
         sys.stderr.write("\nwaiting scanner ... ")
         scanner.quit.set() 
         scanner.join()

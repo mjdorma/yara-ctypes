@@ -191,6 +191,7 @@ class Rules():
     exposes libyara's match capability.
     """
     def __init__(self, paths={},
+                 rules_rootpath=None,
                  strings=[],
                  includes=True,
                  externals={},
@@ -198,13 +199,15 @@ class Rules():
         """Defines a new yara context with specified yara sigs
 
         Options:
-            paths      - {namespace:rules_path,...}
-            strings    - [(namespace, filename, rules_string),...]
-            includes   - allow YARA files to include other YARA files
-                         (default True)
-            externals  - define boolean, integer, or string variables
-                         {var:val,...}
-            fast_match - enable fast matching in the YARA context
+            paths          - {namespace:rules_path,...}
+            rules_rootpath - root of the rules files. Define this to change
+                             curdir before compiling the yara rules files.
+            strings        - [(namespace, filename, rules_string),...]
+            includes       - allow YARA files to include other YARA files
+                             (default True)
+            externals      - define boolean, integer, or string variables
+                             {var:val,...}
+            fast_match     - enable fast matching in the YARA context
 
         Note:
             namespace - defines which namespace we're building our rules under
@@ -213,8 +216,10 @@ class Rules():
             rules_string - the text read from a .yar file
         """
         self._strings = copy.copy(strings)
+        self._rules_rootpath = rules_rootpath
         self.namespaces = set()
         self._contexts = {}
+        self._new_context_lock = threading.Lock()
         for namespace, path in paths.items():
             self.namespaces.add(namespace)
             with open(path, 'rb') as f:
@@ -233,8 +238,16 @@ class Rules():
         ident = threading.current_thread().ident
         c = self._contexts.get(ident, None)
         if c is None:
-            c = RuleContext(*self._context_args)
-            self._contexts[ident] = c
+            with self._new_context_lock:
+                if self._rules_rootpath is not None:
+                    pushdir = os.path.abspath(os.path.curdir)
+                    os.chdir(self._rules_rootpath)
+                try:
+                    c = RuleContext(*self._context_args)
+                finally:
+                    if self._rules_rootpath is not None:
+                        os.chdir(pushdir)
+                self._contexts[ident] = c
         return c
 
     def free(self):
@@ -417,7 +430,7 @@ def load_rules(rules_rootpath=YARA_RULES_ROOT,
 
             paths[namespace] = os.path.join(path, filename)
 
-    rules = Rules(paths=paths, **rules_kwargs)
+    rules = Rules(paths=paths, rules_rootpath=rules_rootpath, **rules_kwargs)
     c = rules.context
     rules.free()
     return rules

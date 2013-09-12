@@ -219,6 +219,7 @@ class Scanner(object):
                 if job is None:
                     self._empty.set()
                     self._rq.put(None)
+                    self._jq.task_done()
                     break
                 try:
                     self._scanned.inc()

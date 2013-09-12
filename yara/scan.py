@@ -4,6 +4,7 @@ import os
 import traceback
 from glob import glob
 from threading import Thread
+from threading import Lock as ThreadLock
 from threading import Event as ThreadEvent
 if sys.version_info[0] < 3: #major
     from Queue import Queue as ThreadQueue
@@ -12,6 +13,7 @@ else:
     from queue import Queue as ThreadQueue
     from queue import Empty as ThreadEmpty
 from multiprocessing import Process
+from multiprocessing import Lock as ProcessLock
 from multiprocessing import Value 
 from multiprocessing import Event as ProcessEvent
 from multiprocessing.queues import JoinableQueue as ProcessQueue
@@ -36,6 +38,20 @@ DEFAULT_EXECUTE_TYPE = EXECUTE_THREAD
 DEFAULT_STREAM_CHUNK_SIZE = 2**20
 DEFAULT_STREAM_READAHEAD_LIMIT = 2**32
 DEFAULT_STREAM_CHUNK_OVERLAP = 1
+
+
+class Counter(object):
+    def __init__(self, Lock, init=0):
+        self._value = Value('i', init)
+        self.lock = Lock()
+
+    def inc(self):
+        with self.lock:
+            self._value.value += 1
+
+    @property
+    def value(self):
+        return self._value.value
 
 
 class Scanner(object):
@@ -70,11 +86,13 @@ class Scanner(object):
             self.Queue = ThreadQueue
             self.Event = ThreadEvent
             self.Empty = ThreadEmpty
+            self.Lock = ThreadLock
             self.Execute = Thread
         else:
             self.Queue = ProcessQueue
             self.Event = ProcessEvent
             self.Empty = ProcessEmpty
+            self.Lock = ProcessLock
             self.Execute = Process
         self._execute_type = execute_type
         
@@ -91,9 +109,9 @@ class Scanner(object):
         self._rq = self.Queue()
         self._empty = self.Event()
         self._pool = []
-        self._scanned = Value('l', 0)
-        self._matches = Value('l', 0)
-        self._errors = Value('l', 0)
+        self._scanned = Counter(self.Lock)
+        self._matches = Counter(self.Lock)
+        self._errors = Counter(self.Lock)
         self.quit = self.Event()
         atexit.register(self.quit.set)
 
@@ -209,14 +227,14 @@ class Scanner(object):
                     self._rq.put(None)
                     break
                 try:
-                    self._scanned.value += 1
+                    self._scanned.inc()
                     f, t, a, k = job
                     f = getattr(self._rules, f)
                     r = f(*a, **k)
                     if r:
-                        self._matches.value += 1
+                        self._matches.inc()
                 except Exception:
-                    self._errors.value += 1
+                    self._errors.inc()
                     r = traceback.format_exc()
                 finally:
                     self._rq.put((t, r))

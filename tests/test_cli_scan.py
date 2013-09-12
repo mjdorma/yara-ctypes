@@ -99,7 +99,7 @@ class TestScan(unittest.TestCase):
                 raise
             self.assertEqual(ret, 0)
             self.assertTrue(stdout)
-            self.assertTrue("scanned: 1" in stderr)
+            self.assertTrue("scanned:1" in stderr)
         
         ret, stdout, stderr = run_main('--fmt=doesnotexist')
         self.assertTrue("unknown output format" in stderr)
@@ -297,41 +297,41 @@ class TestScan(unittest.TestCase):
                     '--recurse-dirs', 
                     '--path-end-include=bird/meta.yar,rules/meta.yar',
                     RULES_ROOT)
-        self.assertTrue("scanned: 2" in stderr)
-        self.assertTrue("matches: 2" in stderr,
-                msg="matches: 2 not in \nso=%s\nse=%s" % (stdout, stderr))
+        self.assertTrue("scanned:2" in stderr)
+        self.assertTrue("matches:2" in stderr,
+                msg="matches:2 not in \nso=%s\nse=%s" % (stdout, stderr))
 
         ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', 
                     '--recurse-dirs', 
                     '--path-end-include=bird/meta.yar',
                     RULES_ROOT)
-        self.assertTrue("scanned: 1" in stderr)
-        self.assertTrue("matches: 1" in stderr)
+        self.assertTrue("scanned:1" in stderr)
+        self.assertTrue("matches:1" in stderr)
 
     def test_path_end_exclude(self):
         ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', 
                     '--recurse-dirs', 
                     '--path-end-exclude=.py,.pyc,.swp',
                     TEST_ROOT)
-        self.assertTrue("scanned: 6" in stderr,
-                    msg = "scanned: 6 not in \nso=%s\nse=%s" % (stdout, stderr))
-        self.assertTrue("matches: 2" in stderr)
+        self.assertTrue("scanned:6" in stderr,
+                    msg = "scanned:6 not in \nso=%s\nse=%s" % (stdout, stderr))
+        self.assertTrue("matches:2" in stderr)
 
     def test_path_contains_include(self):
         ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', 
                     '--recurse-dirs', 
                     '--path-contains-include=bird',
                     RULES_ROOT)
-        self.assertTrue("scanned: 1" in stderr)
-        self.assertTrue("matches: 1" in stderr)
+        self.assertTrue("scanned:1" in stderr)
+        self.assertTrue("matches:1" in stderr)
 
     def test_path_contains_exclude(self):
         ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', 
                     '--recurse-dirs', 
                     '--path-contains-exclude=bird',
                     RULES_ROOT)
-        self.assertTrue("matches: 1" in stderr)
-        self.assertTrue("scanned: 5" in stderr, 
+        self.assertTrue("matches:1" in stderr)
+        self.assertTrue("scanned:5" in stderr, 
                 msg="scanned:5 not in '%s'" % stderr)
 
     def test_filesize_lt(self):
@@ -340,7 +340,7 @@ class TestScan(unittest.TestCase):
                     '--exclude-filesize-lt=210',
                     RULES_ROOT)
         self.assertTrue("rules/meta.yar: main.Bird01" in stdout)
-        self.assertTrue("matches: 1" in stderr)
+        self.assertTrue("matches:1" in stderr)
 
         ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', 
                     '--recurse-dirs', 
@@ -355,7 +355,7 @@ class TestScan(unittest.TestCase):
                     '--exclude-filesize-gt=210',
                     RULES_ROOT)
         self.assertTrue("rules/bird/meta.yar: main.Bird01" in stdout)
-        self.assertTrue("matches: 1" in stderr)
+        self.assertTrue("matches:1" in stderr)
 
         ret, stdout, stderr = run_main('-r', BIRD_YAR, '--simple', 
                     '--recurse-dirs', 

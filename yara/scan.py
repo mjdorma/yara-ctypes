@@ -115,13 +115,10 @@ class Scanner(object):
         self.quit = self.Event()
         atexit.register(self.quit.set)
 
-        self._enqueuer_complete = self.Event()
         if self.enqueuer is not None:
             t = Thread(target=self._enqueuer)
             t.daemon = True
             t.start()
-        else:
-            self._enqueuer_complete.set()
 
         for i in range(execute_pool):
             t = self.Execute(target=self._run)
@@ -204,12 +201,13 @@ class Scanner(object):
     def _enqueuer(self):
         try:
             self.enqueuer()
+            self.enqueue_end()
         except:
+            # abort current operations
+            self.quit.set()
+            self._rq.put(None)
             print("Error in enqueuer: %s" % traceback.format_exc(),
                     file=sys.stderr)
-        finally:
-            self.enqueue_end()
-            self._enqueuer_complete.set()
 
     def _run(self):
         try:
@@ -219,9 +217,6 @@ class Scanner(object):
                 except self.Empty:
                     continue
                 if job is None:
-                    self._enqueuer_complete.wait()
-                    self._jq.task_done()
-                    self._jq.join()
                     self._empty.set()
                     self._rq.put(None)
                     break

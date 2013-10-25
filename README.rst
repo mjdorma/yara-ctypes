@@ -102,6 +102,10 @@ with GitHub's issues system.
 Change log
 ==========
 
+version 1.7.6 (26/10/2013)
+
+* now using setuptools for distribution
+
 version 1.7.5 (13/09/2013)
 
 * added CLI status thread

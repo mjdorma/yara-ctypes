@@ -340,7 +340,7 @@ else:
         if type(s) is bytes:
             return s
         else:
-            return s.encode('utf-8')
+            return s.encode('utf-8', errors='ignore')
 
 
 if sys.version_info[0] < 3: #major
@@ -349,7 +349,7 @@ if sys.version_info[0] < 3: #major
 else:
     def frombyte(s):
         if type(s) is bytes:
-            return str(s, 'utf-8')
+            return str(s.decode(encoding='utf-8', errors='ignore'))
         else:
             return s
 

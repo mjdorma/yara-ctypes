@@ -102,6 +102,10 @@ with GitHub's issues system.
 Change log
 ==========
 
+version 1.7.7 (27/05/2014)
+
+* str conversion fix (contribution by David Cannings @olliencc)
+
 version 1.7.6 (26/10/2013)
 
 * now using setuptools for distribution

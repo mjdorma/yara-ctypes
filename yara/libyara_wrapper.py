@@ -1,10 +1,7 @@
 """
-A ctypes wrapper to libyara.dll or libyara.so version 1.6
+A ctypes wrapper to libyara.dll or libyara.so version 2.1
 
-Note: read the ctypes wrapper README to see details on how to extend
-      yara-1.6 to free matched results after each scan...
-
-[mjdorma@gmail.com]
+[sptonkin@outlook.com]
 """
 import sys
 import os
@@ -13,273 +10,709 @@ import ctypes
 from ctypes import *
 
 
+"""
 #define yara.h
-
-MAX_PATH                               = 1024
-
-MAX_INCLUDE_DEPTH                      = 16
-LEX_BUF_SIZE                           = 1024
-
-STRING_FLAGS_FOUND                     = 0x01
-STRING_FLAGS_REFERENCED                = 0x02
-STRING_FLAGS_HEXADECIMAL               = 0x04
-STRING_FLAGS_NO_CASE                   = 0x08
-STRING_FLAGS_ASCII                     = 0x10
-STRING_FLAGS_WIDE                      = 0x20
-STRING_FLAGS_REGEXP                    = 0x40
-STRING_FLAGS_FULL_WORD                 = 0x80
-STRING_FLAGS_ANONYMOUS                 = 0x100
-STRING_FLAGS_FAST_MATCH                = 0x200
-
-def IS_HEX(flags):
-    return flags & STRING_FLAGS_HEXADECIMAL
-def IS_NO_CASE(flags):
-    return flags & STRING_FLAGS_NO_CASE
-def IS_ASCII(flags):
-    return flags & STRING_FLAGS_ASCII
-def IS_WIDE(flags):
-    return flags & STRING_FLAGS_WIDE
-def IS_REGEXP(flags):
-    return flags & STRING_FLAGS_REGEXP
-def IS_FULL_WORD(flags):
-    return flags & STRING_FLAGS_FULL_WORD
-def IS_ANONYMOUS(flags):
-    return flags & STRING_FLAGS_ANONYMOUS
-
-RULE_FLAGS_MATCH                       = 0x01
-RULE_FLAGS_PRIVATE                     = 0x02
-RULE_FLAGS_GLOBAL                      = 0x04
-RULE_FLAGS_REQUIRE_EXECUTABLE          = 0x08
-RULE_FLAGS_REQUIRE_FILE                = 0x10
-
-ERROR_SUCCESS                          = 0
-
-ERROR_INSUFICIENT_MEMORY               = 1
-ERROR_DUPLICATE_RULE_IDENTIFIER        = 2
-ERROR_INVALID_CHAR_IN_HEX_STRING       = 3
-ERROR_MISMATCHED_BRACKET               = 4
-ERROR_SKIP_AT_END                      = 5
-ERROR_INVALID_SKIP_VALUE               = 6
-ERROR_UNPAIRED_NIBBLE                  = 7
-ERROR_CONSECUTIVE_SKIPS                = 8
-ERROR_MISPLACED_WILDCARD_OR_SKIP       = 9
-ERROR_UNDEFINED_STRING                 = 10
-ERROR_UNDEFINED_IDENTIFIER             = 11
-ERROR_COULD_NOT_OPEN_FILE              = 12
-ERROR_INVALID_REGULAR_EXPRESSION       = 13
-ERROR_SYNTAX_ERROR                     = 14
-ERROR_DUPLICATE_TAG_IDENTIFIER         = 15
-ERROR_UNREFERENCED_STRING              = 16
-ERROR_DUPLICATE_STRING_IDENTIFIER      = 17
-ERROR_CALLBACK_ERROR                   = 18
-ERROR_MISPLACED_OR_OPERATOR            = 19
-ERROR_INVALID_OR_OPERATION_SYNTAX      = 20
-ERROR_SKIP_INSIDE_OR_OPERATION         = 21
-ERROR_NESTED_OR_OPERATION              = 22
-ERROR_MISPLACED_ANONYMOUS_STRING       = 23
-ERROR_COULD_NOT_MAP_FILE               = 24
-ERROR_ZERO_LENGTH_FILE                 = 25
-ERROR_INVALID_ARGUMENT                 = 26
-ERROR_DUPLICATE_META_IDENTIFIER        = 27
-ERROR_INCLUDES_CIRCULAR_REFERENCE      = 28
-ERROR_INCORRECT_VARIABLE_TYPE          = 29
-ERROR_COULD_NOT_ATTACH_TO_PROCESS      = 30
-ERROR_VECTOR_TOO_LONG                  = 31
-ERROR_INCLUDE_DEPTH_EXCEEDED           = 32
-
-META_TYPE_INTEGER                      = 1
-META_TYPE_STRING                       = 2
-META_TYPE_BOOLEAN                      = 3
-
-VARIABLE_TYPE_INTEGER                  = 1
-VARIABLE_TYPE_STRING                   = 2
-VARIABLE_TYPE_BOOLEAN                  = 3
-
-CALLBACK_CONTINUE                      = 0
-CALLBACK_ABORT                         = 1
-CALLBACK_ERROR                         = 2
+"""
 
 
-class MATCH(Structure):
+TRUE = 1
+FALSE = 0
+
+ERROR_SUCCESS                           = 0
+
+ERROR_INSUFICIENT_MEMORY                = 1
+ERROR_COULD_NOT_ATTACH_TO_PROCESS       = 2
+ERROR_COULD_NOT_OPEN_FILE               = 3
+ERROR_COULD_NOT_MAP_FILE                = 4
+ERROR_ZERO_LENGTH_FILE                  = 5
+ERROR_INVALID_FILE                      = 6
+ERROR_CORRUPT_FILE                      = 7
+ERROR_UNSUPPORTED_FILE_VERSION          = 8
+ERROR_INVALID_REGULAR_EXPRESSION        = 9
+ERROR_INVALID_HEX_STRING                = 10
+ERROR_SYNTAX_ERROR                      = 11
+ERROR_LOOP_NESTING_LIMIT_EXCEEDED       = 12
+ERROR_DUPLICATE_LOOP_IDENTIFIER         = 13
+ERROR_DUPLICATE_RULE_IDENTIFIER         = 14
+ERROR_DUPLICATE_TAG_IDENTIFIER          = 15
+ERROR_DUPLICATE_META_IDENTIFIER         = 16
+ERROR_DUPLICATE_STRING_IDENTIFIER       = 17
+ERROR_UNREFERENCED_STRING               = 18
+ERROR_UNDEFINED_STRING                  = 19
+ERROR_UNDEFINED_IDENTIFIER              = 20
+ERROR_MISPLACED_ANONYMOUS_STRING        = 21
+ERROR_INCLUDES_CIRCULAR_REFERENCE       = 22
+ERROR_INCLUDE_DEPTH_EXCEEDED            = 23
+ERROR_INCORRECT_VARIABLE_TYPE           = 24
+ERROR_EXEC_STACK_OVERFLOW               = 25
+ERROR_SCAN_TIMEOUT                      = 26
+ERROR_TOO_MANY_SCAN_THREADS             = 27
+ERROR_CALLBACK_ERROR                    = 28
+ERROR_INVALID_ARGUMENT                  = 29
+ERROR_TOO_MANY_MATCHES                  = 30
+ERROR_INTERNAL_FATAL_ERROR              = 31
+ERROR_NESTED_FOR_OF_LOOP                = 32
+
+CALLBACK_MSG_RULE_MATCHING              = 1
+CALLBACK_MSG_RULE_NOT_MATCHING          = 2
+CALLBACK_MSG_SCAN_FINISHED              = 3
+
+CALLBACK_CONTINUE   = 0
+CALLBACK_ABORT      = 1
+CALLBACK_ERROR      = 2
+
+MAX_ATOM_LENGTH     = 4
+LOOP_LOCAL_VARS     = 4
+MAX_LOOP_NESTING    = 4
+MAX_INCLUDE_DEPTH   = 16
+MAX_STRING_MATCHES  = 1000000
+
+STRING_CHAINING_THRESHOLD = 200
+LEX_BUF_SIZE  = 1024
+
+#FIXME - figure out what the implication for using MAX_THREADS is.
+#        noting that i initially wasn't planning on using it.
+MAX_THREADS = 1
+
+MAX_PATH = 1024
+
+"""
+    Mask examples:
+
+    string : B1 (  01 02 |  03 04 )  3? ?? 45
+    mask:    FF AA FF FF AA FF FF BB F0 00 FF
+
+    string : C5 45 [3]   00 45|
+    mask:    FF FF CC 03 FF FF
+
+    string : C5 45 [2-5]    00 45
+    mask:    FF FF DD 02 03 FF FF
+"""
+MASK_OR            = 0xAA
+MASK_OR_END        = 0xBB
+MASK_EXACT_SKIP    = 0xCC
+MASK_RANGE_SKIP    = 0xDD
+MASK_END           = 0xEE
+
+MASK_MAX_SKIP      = 255
+
+META_TYPE_NULL                  = 0
+META_TYPE_INTEGER               = 1
+META_TYPE_STRING                = 2
+META_TYPE_BOOLEAN               = 3
+
+"""
+# Not sure if we'll need this
+#define META_IS_NULL(x) \
+    ((x) != NULL ? (x)->type == META_TYPE_NULL : TRUE)
+"""
+def META_IS_NULL(x):
+    if x and x.type != META_TYPE_NULL:
+        return TRUE
+    return FALSE
+
+EXTERNAL_VARIABLE_TYPE_NULL          = 0
+EXTERNAL_VARIABLE_TYPE_ANY           = 1
+EXTERNAL_VARIABLE_TYPE_INTEGER       = 2
+EXTERNAL_VARIABLE_TYPE_BOOLEAN       = 3
+EXTERNAL_VARIABLE_TYPE_FIXED_STRING  = 4
+EXTERNAL_VARIABLE_TYPE_MALLOC_STRING = 5
+
+"""
+#define EXTERNAL_VARIABLE_IS_NULL(x) \
+    ((x) != NULL ? (x)->type == EXTERNAL_VARIABLE_TYPE_NULL : TRUE)
+"""
+def EXTERNAL_VARIABLE_IS_NULL(x):
+    if x and x.type != EXTERNAL_VARIABLE_TYPE_NULL:
+        return TRUE
+    return FALSE
+
+
+STRING_TFLAGS_FOUND             = 0x01
+
+STRING_GFLAGS_REFERENCED        = 0x01
+STRING_GFLAGS_HEXADECIMAL       = 0x02
+STRING_GFLAGS_NO_CASE           = 0x04
+STRING_GFLAGS_ASCII             = 0x08
+STRING_GFLAGS_WIDE              = 0x10
+STRING_GFLAGS_REGEXP            = 0x20
+STRING_GFLAGS_FAST_HEX_REGEXP   = 0x40
+STRING_GFLAGS_FULL_WORD         = 0x80
+STRING_GFLAGS_ANONYMOUS         = 0x100
+STRING_GFLAGS_SINGLE_MATCH      = 0x200
+STRING_GFLAGS_LITERAL           = 0x400
+STRING_GFLAGS_FITS_IN_ATOM      = 0x800
+STRING_GFLAGS_NULL              = 0x1000
+STRING_GFLAGS_CHAIN_PART        = 0x2000
+STRING_GFLAGS_CHAIN_TAIL        = 0x4000
+STRING_GFLAGS_REGEXP_DOT_ALL    = 0x8000
+
+def STRING_IS_HEX(flags):
+    return flags & STRING_GFLAGS_HEXADECIMAL
+
+def STRING_IS_NO_CASE(flags):
+    return flags & STRING_GFLAGS_NO_CASE
+
+def STRING_IS_ASCII(flags):
+    return flags & STRING_GFLAGS_ASCII
+
+def STRING_IS_WIDE(flags):
+    return flags & STRING_GFLAGS_WIDE
+
+def STRING_IS_REGEXP(flags):
+    return flags & STRING_GFLAGS_REGEXP
+
+def STRING_IS_REGEXP_DOT_ALL(flags):
+    return flags & STRING_GFLAGS_REGEXP_DOT_ALL
+
+def STRING_IS_FULL_WORD(flags):
+    return flags & STRING_GFLAGS_FULL_WORD
+
+def STRING_IS_ANONYMOUS(flags):
+    return flags & STRING_GFLAGS_ANONYMOUS
+
+def STRING_IS_REFERENCED(flags):
+    return flags & STRING_GFLAGS_REFERENCED
+
+def STRING_IS_SINGLE_MATCH(flags):
+    return flags & STRING_GFLAGS_SINGLE_MATCH
+
+def STRING_IS_LITERAL(flags):
+    return flags & STRING_GFLAGS_LITERAL
+
+def STRING_IS_FAST_HEX_REGEXP(flags):
+    return flags & STRING_GFLAGS_FAST_HEX_REGEXP
+
+def STRING_IS_CHAIN_PART(flags):
+    return flags & STRING_GFLAGS_CHAIN_PART
+
+def STRING_IS_CHAIN_TAIL(flags):
+    return flags & STRING_GFLAGS_CHAIN_TAIL
+
+"""
+#define STRING_IS_NULL(x) \
+    ((x) == NULL || ((x)->g_flags) & STRING_GFLAGS_NULL)
+
+#define STRING_FITS_IN_ATOM(x) \
+    (((x)->g_flags) & STRING_GFLAGS_FITS_IN_ATOM)
+
+#define STRING_FOUND(x) \
+    ((x)->matches[yr_get_tidx()].tail != NULL)
+"""
+
+RULE_TFLAGS_MATCH                = 0x01
+
+RULE_GFLAGS_PRIVATE              = 0x01
+RULE_GFLAGS_GLOBAL               = 0x02
+RULE_GFLAGS_REQUIRE_EXECUTABLE   = 0x04
+RULE_GFLAGS_REQUIRE_FILE         = 0x08
+RULE_GFLAGS_NULL                 = 0x1000
+
+def RULE_IS_PRIVATE(flags):
+    return flags & RULE_GFLAGS_PRIVATE
+
+def RULE_IS_GLOBAL(flags):
+    return flags & RULE_GFLAGS_GLOBAL
+
+def RULE_IS_NULL(flags):
+    return flags & RULE_GFLAGS_NULL
+
+"""
+#define RULE_MATCHES(x) \
+    ((x)->t_flags[yr_get_tidx()] & RULE_TFLAGS_MATCH)
+"""
+
+
+NAMESPACE_TFLAGS_UNSATISFIED_GLOBAL      = 0x01
+
+
+"""
+#TODO - figure out a nice way of doing this REFERENCE_UNION macro.
+#define DECLARE_REFERENCE(type, name) \
+    union { type name; int64_t name##_; }
+
+class _REFERENCE_UNION(Union):
+    _fields_ = [('name', type??? - how do I do this?),
+                ('_name', c_int64)]
+"""
+# perhaps something like the following?
+# will this work? I'm presuming _fields_, being a class variable expects
+# to be constant for all instances and using self will break things.
+class DECLARE_REFERENCE(Union):
+    self __init__(self, arg_type, arg_name, *args, **kwargs):
+        self._fields_ = [(arg_name, arg_type),
+                         ('_%s' % arg_name, c_int64)]
+        super(_REFERENCE_UNION, self).__init__(self, *args, **kwargs)
+
+
+"""
+typedef struct _YR_RELOC
+{
+  int32_t offset;
+  struct _YR_RELOC* next;
+
+} YR_RELOC;
+"""
+class YR_RELOC(Structure):
     pass
-MATCH._fields_ = [
-            ('offset', c_size_t),
-            ('data', c_char_p),
-            ('length', c_int),
-            ('next', POINTER(MATCH)),
-            ]
+YR_RELOC._fields_ = [
+        ('offset', c_int32_t),
+        ('next', POINTER(YR_RELOC)),
+        ]
 
 
-class REGEXP(Structure):
+"""
+typedef struct _YR_ARENA_PAGE
+{
+
+  uint8_t* new_address;
+  uint8_t* address;
+
+  size_t size;
+  size_t used;
+
+  YR_RELOC* reloc_list_head;
+  YR_RELOC* reloc_list_tail;
+
+  struct _YR_ARENA_PAGE* next;
+  struct _YR_ARENA_PAGE* prev;
+
+} YR_ARENA_PAGE;
+"""
+class YR_ARENA_PAGE(Structure):
     pass
-REGEXP._fields_ = [
-            ('regexp', c_void_p),
-            ('extra', c_void_p),
-            ]
+YR_ARENA_PAGE._fields_ = [
+        ('new_address', c_uint8_p),
+        ('address', c_uint8_p),
+
+        ('size', c_size_t),
+        ('used', c_size_t),
+
+        ('reloc_list_head', POINTER(YR_RELOC)),
+        ('reloc_list_tail', POINTER(YR_RELOC)),
+
+        ('next', POINTER(YR_ARENA_PAGE)),
+        ('prev', POINTER(YR_ARENA_PAGE)),
+        ]
 
 
-class MASK_REGEXP(Union):
-    _fields_ = [
-            ('mask', c_char_p),
-            ('re', REGEXP),
-            ]
+"""
+typedef struct _YR_ARENA
+{
+  int flags;
 
+  YR_ARENA_PAGE* page_list_head;
+  YR_ARENA_PAGE* current_page;
 
-class STRING(Structure):
+} YR_ARENA;
+"""
+class YR_ARENA(Structure):
     pass
-STRING._fields_ = [
+YR_ARENA._fields_ = [
             ('flags', c_int),
-            ('identifier', c_char_p),
-            ('length', c_uint),
-            ('string', c_char_p),
-            ('mask_re', MASK_REGEXP),
-            ('matches_head', POINTER(MATCH)),
-            ('matches_tail', POINTER(MATCH)),
-            ('next', POINTER(STRING)),
+            ('page_list_head', POINTER(YR_ARENA_PAGE)),
+            ('current_page', POINTER(YR_ARENA_PAGE)),
             ]
 
 
-class SIB(Union):
-    _fields_ = [
-            ('string', c_char_p),
-            ('integer', c_size_t),
-            ('boolean', c_int),
-            ]
+"""
+typedef struct _YR_MATCH
+{
+  int64_t offset;
+  int32_t length;
 
+  union {
+    uint8_t* data;            // Confirmed matches use "data",
+    int32_t chain_length;    // unconfirmed ones use "chain_length"
+  };
 
-class VARIABLE(Structure):
+  struct _YR_MATCH*  prev;
+  struct _YR_MATCH*  next;
+
+} YR_MATCH;
+"""
+class YR_MATCH(Structure):
     pass
-VARIABLE._fields_ = [
-            ('identifier', c_char_p),
-            ('value', SIB),
-            ('next', POINTER(VARIABLE)),
+YR_MATCH._anonymous_ = ("u",)
+YR_MATCH._fields_ = [
+            ('offset', c_int64),
+            ('length', c_int32),
+            ('u', MATCH_UNION),
+            ('prev', POINTER(YR_MATCH)),
+            ('next', POINTER(YR_MATCH)),
             ]
 
 
-class TAG(Structure):
+"""
+typedef struct _YR_NAMESPACE
+{
+  int32_t t_flags[MAX_THREADS];     // Thread-specific flags
+  DECLARE_REFERENCE(char*, name);
+
+} YR_NAMESPACE;
+"""
+class YR_NAMESPACE(Structure):
     pass
-TAG._fields_ = [
-            ('identifier', c_char_p),
-            ('next', POINTER(TAG)),
+YR_NAMESPACE._anonymous_ = ("u",)
+YR_NAMESPACE._fields_ = [
+            ('t_flags', c_int32 * MAX_THREADS),
+            ('u', DECLARE_REFERENCE(c_char_p, 'name')),
             ]
 
+"""
+typedef struct _YR_META
+{
+  int32_t type;
+  int32_t integer;
 
-class TERM(Structure):
+  DECLARE_REFERENCE(char*, identifier);
+  DECLARE_REFERENCE(char*, string);
+
+} YR_META;
+"""
+class YR_META(Structure):
     pass
-TERM._fields_ = [
-            ('type', c_int),
+YR_META._anonymous_ = ("u",)
+YR_META._fields_ [
+            ('type', c_uint32),
+            ('integer', c_uint32),
+            ('u', DECLARE_REFERENCE(c_char_p, 'identifier')),
+            ('u', DECLARE_REFERENCE(c_char_p, 'string'))
             ]
 
+"""
+typedef struct _YR_MATCHES
+{
+  int32_t count;
 
-class NAMESPACE(Structure):
+  DECLARE_REFERENCE(YR_MATCH*, head);
+  DECLARE_REFERENCE(YR_MATCH*, tail);
+
+} YR_MATCHES;
+"""
+class YR_MATCHES(Structure):
     pass
-NAMESPACE._fields_ = [
-            ('name', c_char_p),
-            ('global_rules_satisfied', c_int),
-            ('next', POINTER(NAMESPACE)),
+YR_MATCHES._anonymous_ = ("u",)
+YR_MATCHES._fields_ [
+            ('count', c_uint32),
+            ('u', DECLARE_REFERENCE(c_void_p, 'identifier')),
+            ('u', DECLARE_REFERENCE(c_void_p, 'string'))
             ]
 
+"""
+typedef struct _YR_STRING
+{
+  int32_t g_flags;
+  int32_t length;
 
-class META(Structure):
+  DECLARE_REFERENCE(char*, identifier);
+  DECLARE_REFERENCE(uint8_t*, string);
+  DECLARE_REFERENCE(struct _YR_STRING*, chained_to);
+
+  int32_t chain_gap_min;
+  int32_t chain_gap_max;
+
+  YR_MATCHES matches[MAX_THREADS];
+  YR_MATCHES unconfirmed_matches[MAX_THREADS];
+
+  #ifdef PROFILING_ENABLED
+  uint64_t clock_ticks;
+  #endif
+
+} YR_STRING;
+"""
+class YR_STRING(Structure):
     pass
-META._fields_ = [
-            ('type', c_int),
-            ('identifier', c_char_p),
-            ('value', SIB),
-            ('next', POINTER(META)),
+YR_STRING._anonymous_ = ("u",)
+YR_STRING._fields_ [
+            ('g_flags', c_uint32),
+            ('length', c_uint32),
+            ('u', DECLARE_REFERENCE(c_char_p, 'identifier')),
+            ('u', DECLARE_REFERENCE(c_uint32_p, 'string')),
+            ('u', DECLARE_REFERENCE(POINTER(YR_STRING), 'chained_to')),
+            ('chain_gap_min', c_int32),
+            ('chain_gap_max', c_int32),
+            ('matches', POINTER(YR_MATCHES) * MAX_THREADS),
+            ('unconfirmed_matches', POINTER(YR_MATCHES) * MAX_THREADS),
             ]
 
 
-class RULE(Structure):
+"""
+typedef struct _YR_RULE
+{
+  int32_t g_flags;               // Global flags
+  int32_t t_flags[MAX_THREADS];  // Thread-specific flags
+
+  DECLARE_REFERENCE(char*, identifier);
+  DECLARE_REFERENCE(char*, tags);
+  DECLARE_REFERENCE(YR_META*, metas);
+  DECLARE_REFERENCE(YR_STRING*, strings);
+  DECLARE_REFERENCE(YR_NAMESPACE*, ns);
+
+  #ifdef PROFILING_ENABLED
+  uint64_t clock_ticks;
+  #endif
+
+} YR_RULE;
+"""
+class YR_RULE(Structure):
     pass
-RULE._fields_ = [
-            ('identifier', c_char_p),
-            ('flags', c_int),
-            ('ns', POINTER(NAMESPACE)),
-            ('string_list_head', POINTER(STRING)),
-            ('tag_list_head', POINTER(TAG)),
-            ('meta_list_head', POINTER(META)),
-            ('condition', POINTER(TERM)),
-            ('next', POINTER(RULE)),
+YR_RULE._anonymous_ = ("u",)
+YR_RULE._fields_ [
+            ('g_flags', c_uint32_t),
+            ('t_flags', c_uint32_t),
+            ('u', DECLARE_REFERENCE(c_char_p, 'identifier')),
+            ('u', DECLARE_REFERENCE(c_char_p, 'tags')),
+            ('u', DECLARE_REFERENCE(POINTER(YR_META), 'metas')),
+            ('u', DECLARE_REFERENCE(POINTER(YR_STRING), 'strings')),
+            ('u', DECLARE_REFERENCE(POINTER(YR_NAMESPACE), 'ns')),
             ]
 
 
-class STRING_LIST_ENTRY(Structure):
+"""
+typedef struct _YR_EXTERNAL_VARIABLE
+{
+  int32_t type;
+  int64_t integer;
+
+  DECLARE_REFERENCE(char*, identifier);
+  DECLARE_REFERENCE(char*, string);
+
+} YR_EXTERNAL_VARIABLE;
+"""
+class YR_EXTERNAL_VARIABLE(Structure):
     pass
-STRING_LIST_ENTRY._fields_ = [
-            ('string', POINTER(STRING)),
-            ('next', POINTER(STRING_LIST_ENTRY)),
+YR_EXTERNAL_VARIABLE._anonymous_ = ('u',)
+YR_EXTERNAL_VARIABLE._fields_ = [
+            ('type', c_unit32_t),
+            ('integer', c_unit64_t),
+
+            ('u', DECLARE_REFERNECE(c_char_p, 'identifier')),
+            ('u', DECLARE_REFERENCE(c_char_p, 'string')),
             ]
 
+"""
+typedef struct _YR_AC_MATCH
+{
+  uint16_t backtrack;
 
-class RULE_LIST_ENTRY(Structure):
+  DECLARE_REFERENCE(YR_STRING*, string);
+  DECLARE_REFERENCE(uint8_t*, forward_code);
+  DECLARE_REFERENCE(uint8_t*, backward_code);
+  DECLARE_REFERENCE(struct _YR_AC_MATCH*, next);
+
+} YR_AC_MATCH;
+"""
+class YR_AC_MATCH(Structure):
     pass
-RULE_LIST_ENTRY._fields_ = [
-            ('rule', POINTER(RULE)),
-            ('next', POINTER(RULE_LIST_ENTRY)),
+YR_AC_MATCH._anonymous_ = ('u',)
+YR_AC_MATCH._fields_ = [
+            ('backtrack', c_uint16_t),
+            
+            ('u', DECLARE_REFERENCE(POINTER(YR_STRING), 'string')),
+            ('u', DECLARE_REFERENCE(c_uint8_t, 'forward_code')),
+            ('u', DECLARE_REFERENCE(c_uint8_t, 'backward_code')),
+            ('u', DECLARE_REFERENCE(POINTER(YR_AC_MATCH), 'next')),
             ]
 
 
-RULE_LIST_HASH_TABLE_SIZE = 10007
-class RULE_LIST(Structure):
+
+
+"""
+typedef struct _YR_AC_STATE
+{
+  int8_t depth;
+
+  DECLARE_REFERENCE(struct _YR_AC_STATE*, failure);
+  DECLARE_REFERENCE(YR_AC_MATCH*, matches);
+
+} YR_AC_STATE;
+"""
+class YR_AC_STATE(Structure):
     pass
-RULE_LIST._fields_ = [
-            ('head', POINTER(RULE)),
-            ('tail', POINTER(RULE)),
-            ('hash_table', (RULE_LIST_ENTRY * RULE_LIST_HASH_TABLE_SIZE)),
+YR_AC_STATE._anonymous_ = ('u',)
+YR_AC_STATE._fields_ = [
+            ('depth', c_uint8_t),
+            
+            ('u', DECLARE_REFERENCE(, 'failure')),
+            ('u', DECLARE_REFERENCE(POINTER(YR_AC_MATCH), 'matches')),
             ]
 
+"""
+typedef struct _YR_AC_STATE_TRANSITION
+{
+  uint8_t input;
 
-class HASH_TABLE(Structure):
+  DECLARE_REFERENCE(YR_AC_STATE*, state);
+  DECLARE_REFERENCE(struct _YR_AC_STATE_TRANSITION*, next);
+
+} YR_AC_STATE_TRANSITION;
+"""
+class YR_AC_STATE_TRANSITION(Structure):
     pass
-HASH_TABLE._fields_ = [
-            ('hashed_strings_2b', ((POINTER(STRING_LIST_ENTRY) * 256) * 256)),
-            ('hashed_strings_1b', (POINTER(STRING_LIST_ENTRY) * 256)),
-            ('non_hashed_strings', POINTER(STRING_LIST_ENTRY)),
-            ('populated', c_int),
-            ]
+YR_AC_STATE_TRANSITION._anonymous_ = ('u',)
+YR_AC_STATE_TRANSITION._fields_ = [
+        ('input', c_uint8_t),
+        
+        ('u', DECLARE_REFERENCE(POINTER(YR_AC_STATE), 'state')),
+        ('u', DECLARE_REFERENCE(POINTER(YR_AC_STATE_TRANSITION), 'next')),
+        ]
 
+"""
+typedef struct _YR_AC_TABLE_BASED_STATE
+{
+  int8_t depth;
 
-class MEMORY_BLOCK(Structure):
+  DECLARE_REFERENCE(YR_AC_STATE*, failure);
+  DECLARE_REFERENCE(YR_AC_MATCH*, matches);
+  DECLARE_REFERENCE(YR_AC_STATE*, state) transitions[256];
+
+} YR_AC_TABLE_BASED_STATE;
+"""
+class YR_AC_TABLE_BASED_STATE(Structure):
     pass
-MEMORY_BLOCK._fields_ = [
-            ('data', c_char_p),
-            ('size', c_size_t),
-            ('base', c_size_t),
-            ('next', POINTER(MEMORY_BLOCK)),
-            ]
+YR_AC_TABLE_BASED_STATE._anonymous_ = ('u',)
+YR_AC_TABLE_BASED_STATE._fields_ = [
+    ('depth', c_int8_t),
+
+    ('u', DECLARE_REFERENCE(POINTER(YR_AC_STATE), 'failure')),
+    ('u', DECLARE_REFERENCE(POINTER(YR_AC_MATCH), 'matches')),
+    ('u', DECLARE_REFERENCE(POINTER(YR_AC_STATE) * 256, 'transitions')),
+    ]
 
 
-#YARACALLBACK = CFUNCTYPE(c_int, POINTER(RULE), py_object)
-YARACALLBACK = CFUNCTYPE(c_int, POINTER(RULE), c_void_p)
-YARAREPORT = CFUNCTYPE(None, c_char_p, c_int, c_char_p)
-def error_report_function(filename, line_number, error_message):
+"""
+typedef struct _YR_AC_LIST_BASED_STATE
+{
+  int8_t depth;
+
+  DECLARE_REFERENCE(YR_AC_STATE*, failure);
+  DECLARE_REFERENCE(YR_AC_MATCH*, matches);
+  DECLARE_REFERENCE(YR_AC_STATE_TRANSITION*, transitions);
+
+} YR_AC_LIST_BASED_STATE;
+"""
+class YR_AC_LIST_BASED_STATE(Structure):
+    pass
+YR_AC_LIST_BASED_STATE._anonymous_ = ('u',)
+YR_AC_LIST_BASED_STATE._fields_ = [
+    ('depth', c_int8_t),
+
+    ('u', DECLARE_REFERENCE(POINTER(YR_AC_STATE), 'failure')),
+    ('u', DECLARE_REFERENCE(POINTER(YR_AC_MATCH), 'matches')),
+    ('u', DECLARE_REFERENCE(POINTER(YR_AC_STATE_TRANSITION), 'transitions')),
+    ]
+
+
+"""
+typedef struct _YR_AC_AUTOMATON
+{
+  DECLARE_REFERENCE(YR_AC_STATE*, root);
+
+} YR_AC_AUTOMATON;
+"""
+class YR_AC_AUTOMATON(Structure):
+    pass
+YR_AC_AUTOMATON._anonymous_ = ('u',)
+YR_AC_AUTOMATON._fields = [
+    ('u', DECLARE_REFERENCE(POINTER(YR_AC_STATE), 'root')),
+    ]
+
+# Skipping YARA_RULES_FILE_HEADER
+"""
+typedef struct _YR_HASH_TABLE_ENTRY
+{
+  char* key;
+  char* ns;
+  void* value;
+
+  struct _YR_HASH_TABLE_ENTRY* next;
+
+} YR_HASH_TABLE_ENTRY;
+"""
+class YR_HASH_TABLE_ENTRY(Structure):
+    pass
+YR_HASH_TABLE_ENTRY._fields_ = [
+    ('key', c_char_p),
+    ('ns', c_char_p),
+    ('value', c_void_p),
+
+    ('next', POINTER(YR_HASH_TABLE_ENTRY)),
+    ]
+
+
+"""
+typedef struct _YR_HASH_TABLE
+{
+  int size;
+
+  YR_HASH_TABLE_ENTRY* buckets[0];
+
+} YR_HASH_TABLE;
+"""
+class YR_HASH_TABLE(Structure):
+    pass
+YR_HASH_TABLE._fields_ = [
+    ('size', c_int),
+
+    ('buckets', POINTER(YR_HASH_TABLE_ENTRY)),
+    ]
+
+
+
+YR_REPORT_FUNC = CFUNCTYPE(c_int, c_char_p, c_int, c_char_p)
+YR_CALLBACK_FUNC = CFUNCTYPE(c_int, POINTER(YR_RULE), c_void_p)
+
+YARA_ERROR_LEVEL_ERROR   = 0
+YARA_ERROR_LEVEL_WARNING = 1
+def error_report_function(error_level,
+                            filename,
+                            line_number,
+                            error_message):
     if not filename:
         filename = "??"
-    print("%s:%s: %s" % (filename, line_number, error_message))
-error_report_function = YARAREPORT(error_report_function)
+    print("%s:%s: (%d) %s" % \
+                (filename, line_number, error_level, error_message))
+error_report_function = YR_REPORT_FUNC(error_report_function)
 
-
-class YARA_CONTEXT(Structure):
+class YR_COMPILER(Structure):
     pass
-YARA_CONTEXT._fields_ = [
+YR_COMPILER._fields_ = [
             ('last_result', c_int),
-            ('error_report_function', YARAREPORT),
+            ('error_report_function', YR_REPORT_FUNC),
             ('errors', c_int),
+            ('error_line', c_int),
             ('last_error', c_int),
             ('last_error_line', c_int),
 
-            ('rule_list', RULE_LIST),
-            ('hash_table', HASH_TABLE),
+            ('error_recovery', jmp_buf), #TODO - what is a jmp_buf?
 
-            ('namespaces', POINTER(NAMESPACE)),
-            ('current_namespace', POINTER(NAMESPACE)),
+            ('sz_arena', POINTER(YR_ARENA)),
+            ('rules_arena', POINTER(YR_ARENA)),
+            ('strings_arena', POINTER(YR_ARENA)),
+            ('code_arena', POINTER(YR_ARENA)),
+            ('re_code_arena', POINTER(YR_ARENA)),
+            ('automaton_arena', POINTER(YR_ARENA)),
+            ('compiled_rules_arena', POINTER(YR_ARENA)),
+            ('externals_arena', POINTER(YR_ARENA)),
+            ('namespaces_arena', POINTER(YR_ARENA)),
+            ('metas_arena', POINTER(YR_ARENA)),
 
-            ('variables', POINTER(VARIABLE)),
+            ('automaton', POINTER(YR_AC_AUTOMATON)),
+            ('rules_table', POINTER(YR_HASH_TABLE)),
+            ('current_namepsace', POINTER(YR_NAMESPACE)),
+            ('current_rule_strings', POINTER(YR_STRING)),
 
-            ('current_rule_strings', POINTER(STRING)),
             ('current_rule_flags', c_int),
-            ('inside_for', c_int),
+            ('externals_count', c_int),
+            ('namespaces_count', c_int),
+
+            ('loop_address', (c_int8 * MAX_LOOP_NESTING)),
+            ('loop_identifier', (c_char_p * MAX_LOOP_NESTING)),
+            ('loop_depth', c_int),
+            ('loop_form_of_mem_offset', c_int),
+
+            ('allow_includes', c_int),
 
             ('file_name_stack', (c_char_p * MAX_INCLUDE_DEPTH)),
             ('file_name_stack_ptr', c_int),
@@ -293,21 +726,55 @@ YARA_CONTEXT._fields_ = [
             ('lex_buf_ptr', c_char_p),
             ('lex_buf_len', c_ushort),
 
-            ('fast_match', c_int),
-            ('allow_includes', c_int),
-            ('scanning_process_memory', c_int),
-
             ('include_base_dir', (c_char * MAX_PATH)),
             ]
 
+class YR_MEMORY_BLOCK(Structure):
+    pass
+YR_MEMORY_BLOCK._fields_ = [
+            ('data', c_char_p),
+            ('size', c_size_t),
+            ('base', c_size_t),
+            ('next', POINTER(YR_MEMORY_BLOCK)),
+            ]
 
-#Import libyara
+"""
+typedef struct _YR_RULES {
+
+  tidx_mask_t tidx_mask;
+  uint8_t* code_start;
+
+  mutex_t mutex;
+
+  YR_ARENA* arena;
+  YR_RULE* rules_list_head;
+  YR_EXTERNAL_VARIABLE* externals_list_head;
+  YR_AC_AUTOMATON* automaton;
+
+} YR_RULES;
+"""
+class YR_RULES(Structure):
+    pass
+YR_RULES._fields_ = [
+            ('tidx_mask', c_uint_t),
+            ('code_start', c_uint8_t_p),
+
+            ('mutex', c_void),
+
+            ('arena', POINTER(YR_ARENA)),
+            ('rules_list_head', POINTER(YR_RULE)),
+            ('externals_list_head', POINTER(YR_EXTERNAL_VARIABLE)),
+            ('automaton', POINTER(YR_AC_AUTOMATON)),
+            ]
+
+
+# Import libyara.
 if sys.platform == 'win32':
     dllpath = os.path.join(sys.prefix, 'DLLs')
-    library = os.path.join(dllpath, 'libyara.dll')
+    library = os.path.join(dllpath, 'libyara.2.dll')
 else:
     dllpath = os.path.join(sys.prefix, 'lib')
-    library = os.path.join(dllpath, 'libyara.so')
+    library = os.path.join(dllpath, 'libyara.2.so')
 
 tmp = os.environ['PATH']
 os.environ['PATH'] += ";%s" % dllpath
@@ -320,7 +787,7 @@ except Exception as err:
 os.environ['PATH'] = tmp
 
 
-#error handling sweetness
+# Error handling sweetness.
 class YaraSyntaxError(Exception):
     pass
 
@@ -331,7 +798,7 @@ class YaraMatchError(Exception):
     pass
 
 
-#convert unicode to ascii if we're in 3x
+# Convert unicode to ascii if we're in 3x.
 if sys.version_info[0] < 3: #major
     def tobyte(s):
         return s
@@ -354,7 +821,8 @@ else:
             return s
 
 
-#Define libyara's function prototypes
+# Define libyara's function prototypes.
+#TODO - you were up to here!
 
 #RULE*             lookup_rule(RULE_LIST* rules,
 #                              const char* identifier,

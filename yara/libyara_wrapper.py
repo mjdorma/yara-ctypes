@@ -1,13 +1,23 @@
 """
 A ctypes wrapper to libyara.dll or libyara.so version 2.1
-
-[sptonkin@outlook.com]
 """
+
 import sys
 import os
 
 import ctypes
 from ctypes import *
+
+
+"""
+Yara 2.1 has a jmp_buf in its YR_COMPILER structure, making the YR_COMPILER
+structure vary in size from platform to platform. Fortunately,
+yara-ctypes is distributed with built libraries for supported platforms it
+is possible to know the size of the jmp_buf struct ahead of time. A helper
+library, libsizeofjmpbuf, contains this information.
+"""
+_lib = ctypes.cdll.LoadLibrary("libs/linux/x86_64/libsizeofjmpbuf.so")
+SIZE_OF_JMP_BUF = ctypes.c_ulong.in_dll(_lib, "SIZE_OF_JMP_BUF").value
 
 
 """
@@ -235,14 +245,26 @@ class _REFERENCE_UNION(Union):
     _fields_ = [('name', type??? - how do I do this?),
                 ('_name', c_int64)]
 """
+
+"""
 # perhaps something like the following?
 # will this work? I'm presuming _fields_, being a class variable expects
 # to be constant for all instances and using self will break things.
 class DECLARE_REFERENCE(Union):
-    self __init__(self, arg_type, arg_name, *args, **kwargs):
+    def __init__(self, arg_type, arg_name, **kwargs):
         self._fields_ = [(arg_name, arg_type),
                          ('_%s' % arg_name, c_int64)]
-        super(_REFERENCE_UNION, self).__init__(self, *args, **kwargs)
+        args = []
+        super(DECLARE_REFERENCE, self).__init__(*args, **kwargs)
+"""
+
+
+def DECLARE_REFERENCE(arg_type, arg_name):
+    class ReferenceUnion(Union):
+        pass
+    ReferenceUnion._fields_ = [(arg_name, arg_type),
+                              ('_%s' % arg_name, c_int64)]
+    return ReferenceUnion
 
 
 """
@@ -256,7 +278,7 @@ typedef struct _YR_RELOC
 class YR_RELOC(Structure):
     pass
 YR_RELOC._fields_ = [
-        ('offset', c_int32_t),
+        ('offset', c_int32),
         ('next', POINTER(YR_RELOC)),
         ]
 
@@ -282,8 +304,8 @@ typedef struct _YR_ARENA_PAGE
 class YR_ARENA_PAGE(Structure):
     pass
 YR_ARENA_PAGE._fields_ = [
-        ('new_address', c_uint8_p),
-        ('address', c_uint8_p),
+        ('new_address', c_void_p),
+        ('address', c_void_p),
 
         ('size', c_size_t),
         ('used', c_size_t),
@@ -331,13 +353,20 @@ typedef struct _YR_MATCH
 
 } YR_MATCH;
 """
+class _YR_MATCH_UNION(Union):
+    pass
+_YR_MATCH_UNION._fields_ = [
+            ('data', c_void_p),
+            ('chain_length', c_int32),
+            ]
+
 class YR_MATCH(Structure):
     pass
 YR_MATCH._anonymous_ = ("u",)
 YR_MATCH._fields_ = [
             ('offset', c_int64),
             ('length', c_int32),
-            ('u', MATCH_UNION),
+            ('u', _YR_MATCH_UNION),
             ('prev', POINTER(YR_MATCH)),
             ('next', POINTER(YR_MATCH)),
             ]
@@ -373,9 +402,10 @@ typedef struct _YR_META
 class YR_META(Structure):
     pass
 YR_META._anonymous_ = ("u",)
-YR_META._fields_ [
+YR_META._fields_ = [
             ('type', c_uint32),
             ('integer', c_uint32),
+
             ('u', DECLARE_REFERENCE(c_char_p, 'identifier')),
             ('u', DECLARE_REFERENCE(c_char_p, 'string'))
             ]
@@ -393,7 +423,7 @@ typedef struct _YR_MATCHES
 class YR_MATCHES(Structure):
     pass
 YR_MATCHES._anonymous_ = ("u",)
-YR_MATCHES._fields_ [
+YR_MATCHES._fields_ = [
             ('count', c_uint32),
             ('u', DECLARE_REFERENCE(c_void_p, 'identifier')),
             ('u', DECLARE_REFERENCE(c_void_p, 'string'))
@@ -424,11 +454,11 @@ typedef struct _YR_STRING
 class YR_STRING(Structure):
     pass
 YR_STRING._anonymous_ = ("u",)
-YR_STRING._fields_ [
+YR_STRING._fields_ = [
             ('g_flags', c_uint32),
             ('length', c_uint32),
             ('u', DECLARE_REFERENCE(c_char_p, 'identifier')),
-            ('u', DECLARE_REFERENCE(c_uint32_p, 'string')),
+            ('u', DECLARE_REFERENCE(c_void_p, 'string')),
             ('u', DECLARE_REFERENCE(POINTER(YR_STRING), 'chained_to')),
             ('chain_gap_min', c_int32),
             ('chain_gap_max', c_int32),
@@ -458,9 +488,9 @@ typedef struct _YR_RULE
 class YR_RULE(Structure):
     pass
 YR_RULE._anonymous_ = ("u",)
-YR_RULE._fields_ [
-            ('g_flags', c_uint32_t),
-            ('t_flags', c_uint32_t),
+YR_RULE._fields_ = [
+            ('g_flags', c_uint32),
+            ('t_flags', c_uint32),
             ('u', DECLARE_REFERENCE(c_char_p, 'identifier')),
             ('u', DECLARE_REFERENCE(c_char_p, 'tags')),
             ('u', DECLARE_REFERENCE(POINTER(YR_META), 'metas')),
@@ -484,10 +514,10 @@ class YR_EXTERNAL_VARIABLE(Structure):
     pass
 YR_EXTERNAL_VARIABLE._anonymous_ = ('u',)
 YR_EXTERNAL_VARIABLE._fields_ = [
-            ('type', c_unit32_t),
-            ('integer', c_unit64_t),
+            ('type', c_uint32),
+            ('integer', c_uint64),
 
-            ('u', DECLARE_REFERNECE(c_char_p, 'identifier')),
+            ('u', DECLARE_REFERENCE(c_char_p, 'identifier')),
             ('u', DECLARE_REFERENCE(c_char_p, 'string')),
             ]
 
@@ -507,11 +537,11 @@ class YR_AC_MATCH(Structure):
     pass
 YR_AC_MATCH._anonymous_ = ('u',)
 YR_AC_MATCH._fields_ = [
-            ('backtrack', c_uint16_t),
+            ('backtrack', c_uint16),
             
             ('u', DECLARE_REFERENCE(POINTER(YR_STRING), 'string')),
-            ('u', DECLARE_REFERENCE(c_uint8_t, 'forward_code')),
-            ('u', DECLARE_REFERENCE(c_uint8_t, 'backward_code')),
+            ('u', DECLARE_REFERENCE(c_void_p, 'forward_code')),
+            ('u', DECLARE_REFERENCE(c_void_p, 'backward_code')),
             ('u', DECLARE_REFERENCE(POINTER(YR_AC_MATCH), 'next')),
             ]
 
@@ -532,9 +562,9 @@ class YR_AC_STATE(Structure):
     pass
 YR_AC_STATE._anonymous_ = ('u',)
 YR_AC_STATE._fields_ = [
-            ('depth', c_uint8_t),
+            ('depth', c_uint8),
             
-            ('u', DECLARE_REFERENCE(, 'failure')),
+            ('u', DECLARE_REFERENCE(POINTER(YR_AC_STATE), 'failure')),
             ('u', DECLARE_REFERENCE(POINTER(YR_AC_MATCH), 'matches')),
             ]
 
@@ -552,7 +582,7 @@ class YR_AC_STATE_TRANSITION(Structure):
     pass
 YR_AC_STATE_TRANSITION._anonymous_ = ('u',)
 YR_AC_STATE_TRANSITION._fields_ = [
-        ('input', c_uint8_t),
+        ('input', c_uint8),
         
         ('u', DECLARE_REFERENCE(POINTER(YR_AC_STATE), 'state')),
         ('u', DECLARE_REFERENCE(POINTER(YR_AC_STATE_TRANSITION), 'next')),
@@ -573,7 +603,7 @@ class YR_AC_TABLE_BASED_STATE(Structure):
     pass
 YR_AC_TABLE_BASED_STATE._anonymous_ = ('u',)
 YR_AC_TABLE_BASED_STATE._fields_ = [
-    ('depth', c_int8_t),
+    ('depth', c_int8),
 
     ('u', DECLARE_REFERENCE(POINTER(YR_AC_STATE), 'failure')),
     ('u', DECLARE_REFERENCE(POINTER(YR_AC_MATCH), 'matches')),
@@ -596,7 +626,7 @@ class YR_AC_LIST_BASED_STATE(Structure):
     pass
 YR_AC_LIST_BASED_STATE._anonymous_ = ('u',)
 YR_AC_LIST_BASED_STATE._fields_ = [
-    ('depth', c_int8_t),
+    ('depth', c_int8),
 
     ('u', DECLARE_REFERENCE(POINTER(YR_AC_STATE), 'failure')),
     ('u', DECLARE_REFERENCE(POINTER(YR_AC_MATCH), 'matches')),
@@ -659,7 +689,6 @@ YR_HASH_TABLE._fields_ = [
     ]
 
 
-
 YR_REPORT_FUNC = CFUNCTYPE(c_int, c_char_p, c_int, c_char_p)
 YR_CALLBACK_FUNC = CFUNCTYPE(c_int, POINTER(YR_RULE), c_void_p)
 
@@ -675,6 +704,10 @@ def error_report_function(error_level,
                 (filename, line_number, error_level, error_message))
 error_report_function = YR_REPORT_FUNC(error_report_function)
 
+
+#FIXME - hmmm... jmp_buf inside this structure is problematic... cannot
+#        know at time of defining interface how big this is on different
+#        systems.
 class YR_COMPILER(Structure):
     pass
 YR_COMPILER._fields_ = [
@@ -685,7 +718,7 @@ YR_COMPILER._fields_ = [
             ('last_error', c_int),
             ('last_error_line', c_int),
 
-            ('error_recovery', jmp_buf), #TODO - what is a jmp_buf?
+            ('error_recovery', c_char * SIZE_OF_JMP_BUF),
 
             ('sz_arena', POINTER(YR_ARENA)),
             ('rules_arena', POINTER(YR_ARENA)),
@@ -756,10 +789,10 @@ typedef struct _YR_RULES {
 class YR_RULES(Structure):
     pass
 YR_RULES._fields_ = [
-            ('tidx_mask', c_uint_t),
-            ('code_start', c_uint8_t_p),
+            ('tidx_mask', c_int32),
+            ('code_start', c_void_p),
 
-            ('mutex', c_void),
+            ('mutex', c_int),
 
             ('arena', POINTER(YR_ARENA)),
             ('rules_list_head', POINTER(YR_RULE)),
@@ -779,7 +812,9 @@ else:
 tmp = os.environ['PATH']
 os.environ['PATH'] += ";%s" % dllpath
 try:
-    libyaradll = cdll.LoadLibrary(library)
+    #libyaradll = cdll.LoadLibrary(library)
+    #FIXME - figure out paths here
+    libyaradll = cdll.LoadLibrary("./libs/linux/x86_64/libyara.2.so")
 except Exception as err:
     print("Failed to import '%s'" % library)
     print("PATH = %s" % os.environ['PATH'])
@@ -821,197 +856,213 @@ else:
             return s
 
 
-# Define libyara's function prototypes.
-#TODO - you were up to here!
-
-#RULE*             lookup_rule(RULE_LIST* rules,
-#                              const char* identifier,
-#                              NAMESPACE* ns);
-libyaradll.lookup_rule.restype = POINTER(RULE)
-libyaradll.lookup_rule.argtypes = [POINTER(RULE_LIST),
-                                c_char_p,
-                                POINTER(NAMESPACE)]
-def lookup_rule(rules, name, namespace):
-    return libyaradll.lookup_rule(rules, tobyte(name), namespace)
+#void yr_initialize(void);
+libyaradll.yr_initialize.argtypes = []
+yr_initialize = libyaradll.yr_initialize
 
 
-#STRING*           lookup_string(STRING* string_list_head,
-#                               const char* identifier);
-libyaradll.lookup_string.restype = POINTER(STRING)
-libyaradll.lookup_string.argtypes = [POINTER(STRING),
-                                  c_char_p]
-def lookup_string(head, name):
-    return libyaradll.lookup_string(head, tobyte(name))
+#void yr_finalize(void);
+libyaradll.yr_finalize.argtypes = []
+yr_finalize = libyaradll.yr_finalize
 
 
-#TAG*              lookup_tag(TAG* tag_list_head, const char* identifier);
-libyaradll.lookup_tag.restype = POINTER(TAG)
-libyaradll.lookup_tag.argtypes = [POINTER(TAG), c_char_p]
-def lookup_tag(head, name):
-    return libyaradll.lookup_tag(head, tobyte(name))
+#void yr_finalize_thread(void);
+libyaradll.yr_finalize_thread.argtypes = []
+yr_finalize_thread = libyaradll.yr_finalize_thread
 
 
-#META*             lookup_meta(META* meta_list_head, const char* identifier);
-libyaradll.lookup_meta.restype = POINTER(META)
-libyaradll.lookup_meta.argtypes = [POINTER(META), c_char_p]
-def lookup_meta(head, name):
-    return libyaradll.lookup_meta(head, tobyte(name))
+#void yr_get_tidx(void);
+libyaradll.yr_get_tidx.argtypes = []
+yr_get_tidx = libyaradll.yr_get_tidx
 
 
-#VARIABLE*         lookup_variable(VARIABLE* _list_head,
-#                                  const char* identifier);
-libyaradll.lookup_variable.restype = POINTER(VARIABLE)
-libyaradll.lookup_variable.argtypes = [POINTER(VARIABLE), c_char_p]
-def lookup_variable(head, name):
-    return libyaradll.lookup_variable(head, tobyte(name))
+#void yr_set_tidx(int);
+libyaradll.yr_set_tidx.argtypes = []
+yr_set_tidx = libyaradll.yr_set_tidx
 
 
-#YARA_CONTEXT*     yr_create_context();
-libyaradll.yr_create_context.restype = POINTER(YARA_CONTEXT)
-libyaradll.yr_create_context.argtypes = []
-yr_create_context = libyaradll.yr_create_context
+#int yr_compiler_create(
+#    YR_COMPILER** compiler);
+libyaradll.yr_compiler_create.restype = c_int
+libyaradll.yr_compiler_create.argtypes = [POINTER(POINTER(YR_COMPILER)),]
+def yr_compiler_create(compiler):
+    return libyara.yr_compiler_create(compiler)
 
 
-#void              yr_destroy_context(YARA_CONTEXT* context);
-libyaradll.yr_destroy_context.restype = None
-libyaradll.yr_destroy_context.argtypes = [POINTER(YARA_CONTEXT)]
-yr_destroy_context = libyaradll.yr_destroy_context
+#void yr_compiler_destroy(
+#    YR_COMPILER* compiler);
+libyaradll.yr_compiler_destroy.argtypes = [POINTER(YR_COMPILER),]
+def yr_compiler_destroy(compiler):
+    return libyara.yr_compiler_destroy(compiler)
 
 
-#int               yr_calculate_rules_weight(YARA_CONTEXT* context);
-libyaradll.yr_calculate_rules_weight.restype = c_int
-libyaradll.yr_calculate_rules_weight.argtypes = [POINTER(YARA_CONTEXT)]
-yr_calculate_rules_weight = libyaradll.yr_calculate_rules_weight
+#int yr_compiler_add_file(
+#    YR_COMPILER* compiler,
+#    FILE* rules_file,
+#    const char* namespace_);
+libyaradll.yr_compiler_add_file.restype = c_int
+libyaradll.yr_compiler_add_file.argtypes = \
+        [POINTER(YR_COMPILER), c_void_p, c_char_p]
+def yr_compiler_add_file(compiler, rules_file, namespace_):
+    with open(rules_file, 'rb') as f:
+        rules_string = f.read()
+    return yr_compiler_add_string(compiler, rules_string, namespace_)
 
 
-#NAMESPACE*        yr_create_namespace(YARA_CONTEXT* context,
-#                                      const char* name);
-libyaradll.yr_create_namespace.restype = POINTER(NAMESPACE)
-libyaradll.yr_create_namespace.argtypes = [POINTER(YARA_CONTEXT), c_char_p]
-def yr_create_namespace(context, name):
-    return libyaradll.yr_create_namespace(context, tobyte(name))
-
-
-#int               yr_define_integer_variable(YARA_CONTEXT* context,
-#                                             const char* identifier,
-#                                             size_t value);
-libyaradll.yr_define_integer_variable.restype = c_int
-libyaradll.yr_define_integer_variable.argtypes = [POINTER(YARA_CONTEXT),
-                                                c_char_p,
-                                                c_size_t]
-def yr_define_integer_variable(context, name, value):
-    return libyaradll.yr_define_integer_variable(context, tobyte(name), value)
-
-
-#int               yr_define_boolean_variable(YARA_CONTEXT* context,
-#                                             const char* identifier,
-#                                             int value);
-libyaradll.yr_define_boolean_variable.restype = c_int
-libyaradll.yr_define_boolean_variable.argtypes = [POINTER(YARA_CONTEXT),
-                                                c_char_p,
-                                                c_size_t]
-def yr_define_boolean_variable(context, name, value):
-    return libyaradll.yr_define_boolean_variable(context, tobyte(name), value)
-
-
-#int               yr_define_string_variable(YARA_CONTEXT* context,
-#                                            const char* identifier,
-#                                            const char* value);
-libyaradll.yr_define_string_variable.restype = c_int
-libyaradll.yr_define_string_variable.argtypes = [POINTER(YARA_CONTEXT),
-                                                c_char_p,
-                                                c_char_p]
-def yr_define_string_variable(context, name, value):
-    return libyaradll.yr_define_string_variable(context, tobyte(name),
-            tobyte(value))
-
-
-#int               yr_undefine_variable(YARA_CONTEXT* context,
-#                                       const char* identifier);
-libyaradll.yr_undefine_variable.restype = c_int
-libyaradll.yr_undefine_variable.argtypes = [POINTER(YARA_CONTEXT), c_char_p]
-def yr_undefine_variable(context, name):
-    return libyaradll.yr_undefine_variable(context, tobyte(name))
-
-
-#char*             yr_get_current_file_name(YARA_CONTEXT* context);
-libyaradll.yr_get_current_file_name.restype = c_char_p
-libyaradll.yr_get_current_file_name.argtypes = [POINTER(YARA_CONTEXT)]
-def yr_get_current_file_name(context):
-    return frombyte(libyaradll.yr_get_current_file_name(context))
-
-
-#int               yr_push_file_name(YARA_CONTEXT* context,
-#                                    const char* file_name);
-libyaradll.yr_push_file_name.restype = c_int
-libyaradll.yr_push_file_name.argtypes = [POINTER(YARA_CONTEXT), c_char_p]
-def yr_push_file_name(context, name):
-    return libyaradll.yr_push_file_name(context, tobyte(name))
-
-
-#void              yr_pop_file_name(YARA_CONTEXT* context);
-libyaradll.yr_pop_file_name.restype = None
-libyaradll.yr_pop_file_name.argtypes = [POINTER(YARA_CONTEXT)]
-yr_pop_file_name = libyaradll.yr_pop_file_name
-
-#int               yr_push_file(YARA_CONTEXT* context, FILE* fh);
-
-#FILE*             yr_pop_file(YARA_CONTEXT* context);
-
-#int               yr_compile_string(const char* rules_string,
-#                                   YARA_CONTEXT* context);
-libyaradll.yr_compile_string.restype = c_int
-libyaradll.yr_compile_string.argtypes = [c_char_p, POINTER(YARA_CONTEXT)]
-def yr_compile_string(rules_string, context):
-    errors = libyaradll.yr_compile_string(tobyte(rules_string), context)
-# TODO:  Couldn't easily identify the yara filename for this error
-#        -->> now handled in rules.py with the self._error_reports check
+#int yr_compiler_add_string(
+#    YR_COMPILER* compiler,
+#    const char* rules_string,
+#    const char* namespace_);
+libyaradll.yr_compiler_add_string.restype = c_int
+libyaradll.yr_compiler_add_string.argtypes = \
+        [POINTER(YR_COMPILER), c_char_p, c_char_p]
+def yr_compiler_add_string(compiler, rules_string, namespace_):
+    errors = libyaradll.yr_compiler_add_string(\
+            compiler, tobyte(rules_string), tobyte(namespace_))
     if errors:
+        print("DEBUG> errors compiling string... TODO...")
+        #TODO - figure this out
+        """
         error_line = context.contents.last_error_line
         error_message = (c_char * 256)()
         yr_get_error_message(context, error_message, 256)
         filename = yr_get_current_file_name(context)
         return (filename, error_line, error_message.value)
-#       #filename = context.contents.file_name_stack[context.contents.file_name_stack_ptr - 1 ]
-#       msg = "Error %s:%s %s" % (filename, error_line, error_message.value)
-#       raise YaraSyntaxError(msg)
+        """
 
 
-#int               yr_compile_file(FILE* rules_file, YARA_CONTEXT* context);
-def yr_compile_file(rules_file, context):
-    with open(rules_file, 'rb') as f:
-        rules_string = f.read()
-    return yr_compile_string(rules_string, context)
+#int yr_compiler_push_file_name(
+#    YR_COMPILER* compiler,
+#    const char* file_name);
+libyaradll.yr_compiler_push_file_name.restype = c_int
+libyaradll.yr_compiler_push_file_name.argtypes = \
+        [POINTER(YR_COMPILER), c_char_p]
+def yr_compiler_push_file_name(compiler, file_name):
+    return libyaradll.yr_compiler_push_file_name(\
+            compiler, tobyte(file_name))
 
 
-#int               yr_scan_mem(unsigned char* buffer,
-#                             size_t buffer_size,
-#                             YARA_CONTEXT* context,
-#                             YARACALLBACK callback, void* user_data);
-libyaradll.yr_scan_mem.restype = c_int
-libyaradll.yr_scan_mem.argtypes = [c_char_p, c_size_t,
-                                POINTER(YARA_CONTEXT),
-                                c_void_p, c_void_p]
-def yr_scan_mem(data, *args):
-    ret = libyaradll.yr_scan_mem(*([tobyte(data)] + list(args)))
+#void yr_compiler_pop_file_name(
+#    YR_COMPILER* compiler);
+libyaradll.yr_compiler_pop_file_name.argtypes = [POINTER(YR_COMPILER)]
+def yr_compiler_pop_file_name(compiler):
+    return libyaradll.yr_compiler_pop_file_name(compiler)
+
+
+#char* yr_compiler_get_error_message(
+#    YR_COMPILER* compiler,
+#    char* buffer,
+#    int buffer_size);
+libyaradll.yr_compiler_get_error_message.restype = c_char_p
+libyaradll.yr_compiler_get_error_message.argtypes = \
+        [POINTER(YR_COMPILER), c_char_p, c_int]
+yr_compiler_get_error_message = libyaradll.yr_compiler_get_error_message
+
+
+#char* yr_compiler_get_current_file_name(
+#    YR_COMPILER* context);
+libyaradll.yr_compiler_get_current_file_name.restype = c_char_p
+libyaradll.yr_compiler_get_current_file_name.argtypes = \
+        [POINTER(YR_COMPILER)]
+def yr_compiler_get_current_file_name(context):
+    return tobyte(libyaradll.yr_compiler_get_current_file_name(context))
+
+
+#int yr_compiler_define_integer_variable(
+#    YR_COMPILER* compiler,
+#    const char* identifier,
+#    int64_t value);
+libyaradll.yr_compiler_define_integer_variable.restype = c_int
+libyaradll.yr_compiler_define_integer_variable.argtypes = \
+        [POINTER(YR_COMPILER), c_char_p, c_int64]
+def yr_compiler_define_integer_variable(compiler, identifier, value):
+    return libyaradll.yr_compiler_define_integer_variable(\
+            compiler, tobyte(identifier), value)
+
+
+#int yr_compiler_define_boolean_variable(
+#    YR_COMPILER* compiler,
+#    const char* identifier,
+#    int value);
+libyaradll.yr_compiler_define_boolean_variable.restype = c_int
+libyaradll.yr_compiler_define_boolean_variable.argtypes = \
+        [POINTER(YR_COMPILER), c_char_p, c_int64]
+def yr_compiler_define_boolean_variable(compiler, identifier, value):
+    return libyaradll.yr_compiler_define_boolean_variable(\
+            compiler, tobyte(identifier), value)
+
+
+#int yr_compiler_define_string_variable(
+#    YR_COMPILER* compiler,
+#    const char* identifier,
+#    const char* value);
+libyaradll.yr_compiler_define_string_variable.restype = c_int
+libyaradll.yr_compiler_define_string_variable.argtypes = \
+        [POINTER(YR_COMPILER), c_char_p, c_int64]
+def yr_compiler_define_string_variable(compiler, identifier, value):
+    return libyaradll.yr_compiler_define_string_variable(\
+            compiler, tobyte(identifier), value)
+
+
+#int yr_compiler_get_rules(
+#    YR_COMPILER* compiler,
+#    YR_RULES** rules);
+libyaradll.yr_compiler_get_rules.restype = c_int
+libyaradll.yr_compiler_get_rules.argtypes = \
+        [POINTER(YR_COMPILER), POINTER(POINTER(YR_RULES))]
+def yr_compiler_get_rules(compiler, rules):
+    return libyaradll.yr_compiler_get_rules(compiler, rules)
+
+
+#int yr_rules_scan_mem(
+#    YR_RULES* rules,
+#    uint8_t* buffer,
+#    size_t buffer_size,
+#    YR_CALLBACK_FUNC callback,
+#    void* user_data,
+#    int fast_scan_mode,
+#    int timeout);
+libyaradll.yr_rules_scan_mem.restype = c_int
+libyaradll.yr_rules_scan_mem.argtypes = \
+        [POINTER(YR_RULES),
+         c_char_p,
+         c_size_t,
+         c_void_p,
+         c_void_p,
+         c_int,
+         c_int]
+def yr_rules_scan_mem(rules, buffer, buffer_size, callback, user_data,
+                        fast_scan_mode, timeout):
+    ret = libyaradll.yr_rules_scan_mem(tules, buffer, buffer_size,
+                        callback, user_data, fast_scan_mode, timeout)
     if ret == ERROR_CALLBACK_ERROR:
         raise YaraCallbackError()
-    if ret != ERROR_SUCCESS:
-        raise Exception("Unknown error occurred")
+    elif ret != ERROR_SUCCESS:
+        raise Exception("Unknown error occured (%d)" % ret)
 
 
-#int               yr_scan_file(const char* file_path,
-#                               YARA_CONTEXT* context,
-#                               YARACALLBACK callback, void* user_data);
-libyaradll.yr_scan_file.restype = c_int
-libyaradll.yr_scan_file.argtypes = [c_char_p,
-                                POINTER(YARA_CONTEXT),
-                                c_void_p, c_void_p]
-def yr_scan_file(path, *args):
-    ret = libyaradll.yr_scan_file(*([tobyte(path)] + list(args)))
+#int yr_rules_scan_file(
+#    YR_RULES* rules,
+#    const char* filename,
+#    YR_CALLBACK_FUNC callback,
+#    void* user_data,
+#    int fast_scan_mode,
+#    int timeout);
+libyaradll.yr_rules_scan_file.restype = c_int
+libyaradll.yr_rules_scan_file.argtypes = \
+        [POINTER(YR_RULES),
+         c_char_p,
+         c_void_p,
+         c_void_p,
+         c_int,
+         c_int]
+def yr_rules_scan_file(rules, filename, callback, user_data,
+                        fast_scan_mode, timeout):
+    ret = libyaradll.yr_rules_scan_file(rules, tobyte(filename), callback,
+                    user_data, fast_scan_mode, timeout)
     if ret == ERROR_CALLBACK_ERROR:
         raise YaraCallbackError()
-    if ret != ERROR_SUCCESS:
+    elif ret != ERROR_SUCCESS:
         if ret == ERROR_COULD_NOT_OPEN_FILE:
             raise YaraMatchError("Could not open file '%s'" % path)
         elif ret == ERROR_COULD_NOT_MAP_FILE:
@@ -1019,16 +1070,26 @@ def yr_scan_file(path, *args):
         elif ret == ERROR_ZERO_LENGTH_FILE:
             raise YaraMatchError("Zero length file '%s'" % path)
         else:
-            raise YaraMatchError("Unknown error occurred")
+            raise YaraMatchError("Unknown error occurred (%d)" % ret)
 
 
-#int               yr_scan_proc(int pid, YARA_CONTEXT* context,
-#                               YARACALLBACK callback, void* user_data);
-libyaradll.yr_scan_proc.restype = c_int
-libyaradll.yr_scan_proc.argtypes = [c_int, POINTER(YARA_CONTEXT),
-                                 c_void_p, c_void_p]
-def yr_scan_proc(*args):
-    ret = libyaradll.yr_scan_proc(*args)
+#int yr_rules_scan_proc(
+#    YR_RULES* rules,
+#    int pid,
+#    YR_CALLBACK_FUNC callback,
+#    void* user_data,
+#    int fast_scan_mode,
+#    int timeout);
+libyaradll.yr_rules_scan_proc.restype = c_int
+libyaradll.yr_rules_scan_proc.argtypes = \
+        [POINTER(YR_RULES),
+         c_int,
+         c_void_p,
+         c_void_p,
+         c_int,
+         c_int]
+def yr_rules_scan_proc(*args):
+    ret = libyaradll.yr_rules_scan_proc(*args)
     if ret == ERROR_CALLBACK_ERROR:
         raise YaraCallbackError()
     if ret != ERROR_SUCCESS:
@@ -1037,40 +1098,86 @@ def yr_scan_proc(*args):
         elif ret == ERROR_INSUFICIENT_MEMORY:
             raise YaraMatchError("Not enough memory")
         else:
-            raise YaraMatchError("Unknown error occurred")
+            raise YaraMatchError("Unknown error occurred (%d)" % ret)
 
 
-#char*             yr_get_error_message(YARA_CONTEXT* context,
-#                                       char* buffer, int buffer_size);
-libyaradll.yr_get_error_message.restype = c_char_p
-libyaradll.yr_get_error_message.argtypes = [POINTER(YARA_CONTEXT),
-                                    c_char_p, c_int]
-yr_get_error_message = libyaradll.yr_get_error_message
+#int yr_rules_save(
+#    YR_RULES* rules,
+#    const char* filename);
+libyaradll.yr_rules_save.restype = c_int
+libyaradll.yr_rules_save.argtypes = \
+        [POINTER(YR_RULES),
+         c_char_p]
+def yr_rules_save(*args):
+    return libyaradll.yr_rules_save(*args)
 
 
-#void              yr_init();
-libyaradll.yr_init.argtypes = []
-libyaradll.yr_init()
+#int yr_rules_load(
+#    const char* filename,
+#    YR_RULES** rules);
+libyaradll.yr_rules_load.restype = c_int
+libyaradll.yr_rules_load.argtypes = [c_char_p, POINTER(POINTER(YR_RULES))]
+def yr_rules_load(filename, rules):
+    return libyaradll.yr_rules_load(filename, rules)
 
 
-#### EXTRA Goodness!
-
-if hasattr(libyaradll, 'yr_free_matches'):
-    libyaradll.yr_free_matches.restype = None
-    libyaradll.yr_free_matches.argtypes = [POINTER(YARA_CONTEXT)]
-    yr_free_matches = libyaradll.yr_free_matches
-else:
-    raise NotImplementedError("Add yr_free_matches to libyara >>README""")
+#int yr_rules_destroy(
+#    YR_RULES* rules);
+libyaradll.yr_rules_destroy.restype = c_int
+libyaradll.yr_rules_destroy.argtypes = [POINTER(YR_RULES)]
+def yr_rules_destroy(rules):
+    return libyaradll.yr_rules_destroy(rules)
 
 
-#See if we have yr_malloc_count and yr_free_count for testing?
-#  yr_malloc_count and yr_free_count track how many free's and malloc's have
-#  been called in the libyara.dll/so
-#
-try:
-    yr_malloc_count()
-    yr_free_count()
-except:
-    #:( nope... stub them out!
-    yr_malloc_count = lambda: 0
-    yr_free_count = lambda: 0
+#int yr_rules_define_integer_variable(
+#    YR_RULES* rules,
+#    const char* identifier,
+#    int64_t value);
+libyaradll.yr_rules_define_integer_variable.restype = c_int
+libyaradll.yr_rules_define_integer_variable.argtypes = \
+        [POINTER(YR_RULES),
+         c_char_p,
+         c_int64]
+def yr_rules_define_integer_variable(rules, identifier, value):
+    return libyaradll.yr_rules_define_integer_variable(\
+            rules, identifier, value)
+
+
+#int yr_rules_define_boolean_variable(
+#    YR_RULES* rules,
+#    const char* identifier,
+#    int value);
+libyaradll.yr_rules_define_boolean_variable.restype = c_int
+libyaradll.yr_rules_define_boolean_variable.argtypes = \
+        [POINTER(YR_RULES),
+         c_char_p,
+         c_int]
+def yr_rules_define_boolean_variable(rules, identifier, value):
+    return libyaradll.yr_rules_define_boolean_variable(\
+            rules, identifier, value)
+
+
+#int yr_rules_define_string_variable(
+#    YR_RULES* rules,
+#    const char* identifier,
+#    const char* value);
+libyaradll.yr_rules_define_string_variable.restype = c_int
+libyaradll.yr_rules_define_string_variable.argtypes = \
+        [POINTER(YR_RULES),
+         c_char_p,
+         c_char_p]
+def yr_rules_define_string_variable(rules, identifier, value):
+    return libyaradll.yr_rules_define_string_variable(\
+            rules, identifier, value)
+
+
+#void yr_rules_print_profiling_info(
+#    YR_RULES* rules);
+#libyaradll.yr_rules_print_profiling_info.argtypes = [POINTER(YR_RULES)]
+#def yr_rules_print_profiling_info(rules):
+#    return libyaradll.yr_rules_print_profiling_info(rules)
+
+# End of interface definition.
+
+# Initialise the library.
+yr_initialize()

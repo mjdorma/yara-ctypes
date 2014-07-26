@@ -3,7 +3,12 @@ Introduction to yara-ctypes-python
 
 Branch for porting yara-ctypes to yara 2.x.
 
-TODO
+Authors
+```````
+
+- Michael Dorman <mjdorma@gmail.com>
+- Stephen Tonkin <sptonkin@outlook.com>
+
 
 Install and run
 ===============

@@ -491,6 +491,7 @@ YR_RULE._anonymous_ = ("u",)
 YR_RULE._fields_ = [
             ('g_flags', c_uint32),
             ('t_flags', c_uint32),
+
             ('u', DECLARE_REFERENCE(c_char_p, 'identifier')),
             ('u', DECLARE_REFERENCE(c_char_p, 'tags')),
             ('u', DECLARE_REFERENCE(POINTER(YR_META), 'metas')),
@@ -689,8 +690,8 @@ YR_HASH_TABLE._fields_ = [
     ]
 
 
-YR_REPORT_FUNC = CFUNCTYPE(c_int, c_char_p, c_int, c_char_p)
-YR_CALLBACK_FUNC = CFUNCTYPE(c_int, POINTER(YR_RULE), c_void_p)
+YR_REPORT_FUNC = CFUNCTYPE(None, c_int, c_char_p, c_int, c_char_p)
+YR_CALLBACK_FUNC = CFUNCTYPE(c_int, c_int, POINTER(YR_RULE), c_void_p)
 
 YARA_ERROR_LEVEL_ERROR   = 0
 YARA_ERROR_LEVEL_WARNING = 1
@@ -858,7 +859,10 @@ else:
 
 #void yr_initialize(void);
 libyaradll.yr_initialize.argtypes = []
-yr_initialize = libyaradll.yr_initialize
+def yr_initialize():
+    """Should be called by main thread before using any other
+    function from libyara."""
+    return libyaradll.yr_initialize()
 
 
 #void yr_finalize(void);
@@ -886,14 +890,14 @@ yr_set_tidx = libyaradll.yr_set_tidx
 libyaradll.yr_compiler_create.restype = c_int
 libyaradll.yr_compiler_create.argtypes = [POINTER(POINTER(YR_COMPILER)),]
 def yr_compiler_create(compiler):
-    return libyara.yr_compiler_create(compiler)
+    return libyaradll.yr_compiler_create(compiler)
 
 
 #void yr_compiler_destroy(
 #    YR_COMPILER* compiler);
 libyaradll.yr_compiler_destroy.argtypes = [POINTER(YR_COMPILER),]
 def yr_compiler_destroy(compiler):
-    return libyara.yr_compiler_destroy(compiler)
+    return libyaradll.yr_compiler_destroy(compiler)
 
 
 #int yr_compiler_add_file(
@@ -1033,8 +1037,8 @@ libyaradll.yr_rules_scan_mem.argtypes = \
          c_int]
 def yr_rules_scan_mem(rules, buffer, buffer_size, callback, user_data,
                         fast_scan_mode, timeout):
-    ret = libyaradll.yr_rules_scan_mem(tules, buffer, buffer_size,
-                        callback, user_data, fast_scan_mode, timeout)
+    ret = libyaradll.yr_rules_scan_mem(rules, tobyte(buffer),
+                buffer_size, callback, user_data, fast_scan_mode, timeout)
     if ret == ERROR_CALLBACK_ERROR:
         raise YaraCallbackError()
     elif ret != ERROR_SUCCESS:

@@ -18,6 +18,7 @@ library, libsizeofjmpbuf, contains this information.
 """
 _lib = ctypes.cdll.LoadLibrary("libs/linux/x86_64/libsizeofjmpbuf.so")
 SIZE_OF_JMP_BUF = ctypes.c_ulong.in_dll(_lib, "SIZE_OF_JMP_BUF").value
+SIZE_OF_MUTEX_T = ctypes.c_ulong.in_dll(_lib, "SIZE_OF_MUTEX_T").value
 
 
 """
@@ -80,9 +81,8 @@ MAX_STRING_MATCHES  = 1000000
 STRING_CHAINING_THRESHOLD = 200
 LEX_BUF_SIZE  = 1024
 
-#FIXME - figure out what the implication for using MAX_THREADS is.
-#        noting that i initially wasn't planning on using it.
-MAX_THREADS = 1
+#MAX_THREADS must be set to size_of
+MAX_THREADS = sizeof(c_uint32) * 8
 
 MAX_PATH = 1024
 
@@ -209,6 +209,14 @@ def STRING_IS_CHAIN_TAIL(flags):
 #define STRING_FOUND(x) \
     ((x)->matches[yr_get_tidx()].tail != NULL)
 """
+def STRING_IS_NULL(x):
+    return x and x.g_flags & STRING_GFLAGS_NULL
+
+def STRING_FITS_IN_ATOM(x):
+    return x and x.g_flags & STRING_GFLAGS_FITS_IN_ATOM
+
+def STRING_FOUND(x):
+    return x and x.g_flags & x[yr_get_tidx()].tail != None
 
 RULE_TFLAGS_MATCH                = 0x01
 
@@ -231,37 +239,21 @@ def RULE_IS_NULL(flags):
 #define RULE_MATCHES(x) \
     ((x)->t_flags[yr_get_tidx()] & RULE_TFLAGS_MATCH)
 """
+def RULE_MATCHES(x):
+    return x and x.t_flags[yr_get_tidx()] & RULE_TFLAGS_MATCH
 
 
 NAMESPACE_TFLAGS_UNSATISFIED_GLOBAL      = 0x01
 
 
-"""
-#TODO - figure out a nice way of doing this REFERENCE_UNION macro.
-#define DECLARE_REFERENCE(type, name) \
-    union { type name; int64_t name##_; }
-
-class _REFERENCE_UNION(Union):
-    _fields_ = [('name', type??? - how do I do this?),
-                ('_name', c_int64)]
-"""
-
-"""
-# perhaps something like the following?
-# will this work? I'm presuming _fields_, being a class variable expects
-# to be constant for all instances and using self will break things.
-class DECLARE_REFERENCE(Union):
-    def __init__(self, arg_type, arg_name, **kwargs):
-        self._fields_ = [(arg_name, arg_type),
-                         ('_%s' % arg_name, c_int64)]
-        args = []
-        super(DECLARE_REFERENCE, self).__init__(*args, **kwargs)
-"""
-
 
 def DECLARE_REFERENCE(arg_type, arg_name):
     class ReferenceUnion(Union):
         pass
+
+    #print("------------------------------------------------")
+    #print("creating union %s" % ReferenceUnion.__class__)
+    #print("               %s, %s" % (arg_name, arg_type))
     ReferenceUnion._fields_ = [(arg_name, arg_type),
                               ('_%s' % arg_name, c_int64)]
     return ReferenceUnion
@@ -382,10 +374,10 @@ typedef struct _YR_NAMESPACE
 """
 class YR_NAMESPACE(Structure):
     pass
-YR_NAMESPACE._anonymous_ = ("u",)
+YR_NAMESPACE._anonymous_ = ("_n",)
 YR_NAMESPACE._fields_ = [
             ('t_flags', c_int32 * MAX_THREADS),
-            ('u', DECLARE_REFERENCE(c_char_p, 'name')),
+            ('_n', DECLARE_REFERENCE(c_char_p, 'name')),
             ]
 
 """
@@ -401,13 +393,13 @@ typedef struct _YR_META
 """
 class YR_META(Structure):
     pass
-YR_META._anonymous_ = ("u",)
+YR_META._anonymous_ = ("_i", "_s")
 YR_META._fields_ = [
-            ('type', c_uint32),
-            ('integer', c_uint32),
+            ('type', c_int32),
+            ('integer', c_int32),
 
-            ('u', DECLARE_REFERENCE(c_char_p, 'identifier')),
-            ('u', DECLARE_REFERENCE(c_char_p, 'string'))
+            ('_i', DECLARE_REFERENCE(c_char_p, 'identifier')),
+            ('_s', DECLARE_REFERENCE(c_char_p, 'string'))
             ]
 
 """
@@ -422,6 +414,7 @@ typedef struct _YR_MATCHES
 """
 class YR_MATCHES(Structure):
     pass
+YR_MATCHES._pack_ = 1
 YR_MATCHES._anonymous_ = ("u",)
 YR_MATCHES._fields_ = [
             ('count', c_uint32),
@@ -453,17 +446,17 @@ typedef struct _YR_STRING
 """
 class YR_STRING(Structure):
     pass
-YR_STRING._anonymous_ = ("u",)
+YR_STRING._anonymous_ = ("_i", "_s", "_c")
 YR_STRING._fields_ = [
             ('g_flags', c_uint32),
             ('length', c_uint32),
-            ('u', DECLARE_REFERENCE(c_char_p, 'identifier')),
-            ('u', DECLARE_REFERENCE(c_void_p, 'string')),
-            ('u', DECLARE_REFERENCE(POINTER(YR_STRING), 'chained_to')),
+            ('_i', DECLARE_REFERENCE(c_char_p, 'identifier')),
+            ('_s', DECLARE_REFERENCE(c_void_p, 'string')),
+            ('_c', DECLARE_REFERENCE(POINTER(YR_STRING), 'chained_to')),
             ('chain_gap_min', c_int32),
             ('chain_gap_max', c_int32),
-            ('matches', POINTER(YR_MATCHES) * MAX_THREADS),
-            ('unconfirmed_matches', POINTER(YR_MATCHES) * MAX_THREADS),
+            ('matches', YR_MATCHES * MAX_THREADS),
+            ('unconfirmed_matches', YR_MATCHES * MAX_THREADS),
             ]
 
 
@@ -487,17 +480,25 @@ typedef struct _YR_RULE
 """
 class YR_RULE(Structure):
     pass
-YR_RULE._anonymous_ = ("u",)
+#YR_RULE._anonymous_ = ('_i', '_t', '_m', '_s', '_n')
+YR_RULE._pack_ = 1
 YR_RULE._fields_ = [
-            ('g_flags', c_uint32),
-            ('t_flags', c_uint32),
+            ('g_flags', c_int32),
+            ('t_flags', c_int32 * MAX_THREADS),
 
-            ('u', DECLARE_REFERENCE(c_char_p, 'identifier')),
-            ('u', DECLARE_REFERENCE(c_char_p, 'tags')),
-            ('u', DECLARE_REFERENCE(POINTER(YR_META), 'metas')),
-            ('u', DECLARE_REFERENCE(POINTER(YR_STRING), 'strings')),
-            ('u', DECLARE_REFERENCE(POINTER(YR_NAMESPACE), 'ns')),
+            ('identifier', POINTER(c_char)),
+            ('tags', POINTER(c_char)),
+            ('metas', POINTER(YR_META)),
+            ('strings', POINTER(YR_STRING)),
+            ('ns', POINTER(YR_NAMESPACE)),
+            #TODO - try to restore the following
+            #('_i', DECLARE_REFERENCE(POINTER(c_char), 'identifier')),
+            #('_t', DECLARE_REFERENCE(POINTER(c_char), 'tags')),
+            #('_m', DECLARE_REFERENCE(POINTER(YR_META), 'metas')),
+            #('_s', DECLARE_REFERENCE(POINTER(YR_STRING), 'strings')),
+            #('_n', DECLARE_REFERENCE(POINTER(YR_NAMESPACE), 'ns')),
             ]
+
 
 
 """
@@ -790,10 +791,10 @@ typedef struct _YR_RULES {
 class YR_RULES(Structure):
     pass
 YR_RULES._fields_ = [
-            ('tidx_mask', c_int32),
+            ('tidx_mask', c_uint32),
             ('code_start', c_void_p),
 
-            ('mutex', c_int),
+            ('mutex', c_char * SIZE_OF_MUTEX_T),
 
             ('arena', POINTER(YR_ARENA)),
             ('rules_list_head', POINTER(YR_RULE)),

@@ -7,8 +7,9 @@ from threading import Thread
 
 from yara import Rules
 import yara
-from yara.libyara_wrapper import yr_malloc_count
-from yara.libyara_wrapper import yr_free_count
+#TODO
+#from yara.libyara_wrapper import yr_malloc_count
+#from yara.libyara_wrapper import yr_free_count
 
 RULES_ROOT = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'rules')
 
@@ -90,10 +91,12 @@ class TestRulesMemoryLeakHunt(unittest.TestCase):
 class TestYaraCompile(unittest.TestCase):
     """test yara compile interface"""
 
+    #TODO - test setting custom callback
+    #TODO - test setting custom error report function
+
     def assert_scan(self, rule):
         res = rule.match(data="song bird")
-        hit = list(res.values())[0][0]
-        self.assertEqual(hit['rule'], 'TestMeta')
+        self.assertEqual(res[0].identifier, 'TestMeta')
 
     def test_compile_filepath(self):
         """compile filepath"""

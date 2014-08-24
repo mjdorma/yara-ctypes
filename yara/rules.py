@@ -11,9 +11,9 @@ import types
 import copy
 import traceback
 import threading
+import collections
 
 from yara.libyara_wrapper import *
-
 
 if sys.version_info[0] < 3: 
     INT_TYPES = [long, int]
@@ -51,14 +51,12 @@ class Compiler:
 
     def compile_file(self, path, namespace=None):
         yr_compiler_push_file_name(self._compiler, path)
-
         errors = yr_compiler_add_file(self._compiler, path, namespace)
         if errors > 0:
             raise Exception("errors compiling rules")
 
     def compile_string(self, string, namespace=None):
-        print("adding rules (%s:%s) to compiler" % (path, namespace))
-        errors = yr_compiler_add_string(self._compiler, path, namespace)
+        errors = yr_compiler_add_string(self._compiler, string, namespace)
         if errors > 0:
             raise Exception("errors compiling rules")
         
@@ -69,6 +67,40 @@ class Compiler:
 
     def __del__(self):
         yr_compiler_destroy(self._compiler)
+
+
+class YaraCallback:
+    def __init__(self, callback=None):
+        self.matches = []
+        self.callback = callback
+
+    def __call__(self, message, rule, data):
+
+        if message == CALLBACK_MSG_RULE_NOT_MATCHING:
+            if self.callback is None:
+                return CALLBACK_CONTINUE
+
+        elif message == CALLBACK_MSG_SCAN_FINISHED:
+            return CALLBACK_CONTINUE
+
+        m = Match(rule)
+        if message == CALLBACK_MSG_RULE_MATCHING:
+            self.matches.append(m)
+
+        if self.callback:
+            does_match = (message == CALLBACK_MSG_RULE_MATCHING)
+            res = self.callback(dict(matches=does_match,
+                                      rule=rule,
+                                      namespace=m.ns,
+                                      tags=m.tags,
+                                      meta=m.meta,
+                                      strings=m.strings))
+            if res != 0:
+                return CALLBACK_ERROR
+            else:
+                return res
+
+        return CALLBACK_CONTINUE
 
 
 class Rule():
@@ -113,6 +145,11 @@ class Rule():
             meta = cast(addressof(meta.contents) + sizeof(YR_META), POINTER(YR_META))
 
         # Process rule strings.
+        self._process_strings(rule)
+
+    def _process_strings(self, rule):
+        """Must be implemented in subclasses!"""
+        # Process rule strings.
         self.strings = {}
         strings = rule.contents.strings
         while not STRING_IS_NULL(strings.contents):
@@ -122,21 +159,45 @@ class Rule():
                 cast(addressof(strings.contents) + sizeof(YR_STRING),POINTER(YR_STRING))
 
     def __str__(self):
-        return """<Rule '%s'
+        return """<%s '%s'
             tags: %s
             metas: %s
             strings: %s
-            """ % (self.uid,
+            """ % (self.__name__,
+                self.uid,
                 ", ".join(self.tags),
                 "\n\t\t".join(["%s: %s" % (k,v) for k,v in self.metas.items()]),
                 "\n\t\t".join(["%s: %s" % (k,v) for k,v in self.strings.items()]))
+
+
+class Match(Rule):
+
+    def _process_strings(self, r):
+        # Process rule strings.
+        self.strings = []
+        strings = r.contents.strings
+        while not STRING_IS_NULL(strings.contents):
+            if STRING_FOUND(strings):
+                m = STRING_MATCHES(strings.contents).head
+                while m:
+                    s = frombyte(string_at(m.contents.data, m.contents.length))
+                    self.strings.append((m.contents.offset, r.contents.identifier, s))
+                    m = m.contents.next
+
+            strings = \
+                cast(addressof(strings.contents) + sizeof(YR_STRING),POINTER(YR_STRING))
+
+    def get_matches(self):
+        # TODO
+        raise NotImplementedError("TODO - write this")
+
 
 
 class Rules():
     """Rules represent compiled rules."""
     def __init__(self,
                  compiled_rules_path=None,
-                 paths=None,
+                 paths={},
                  externals={},
                  #defines={},
                  #include_path=[],
@@ -164,16 +225,8 @@ class Rules():
             filename  - filename which the rules_string came from
             rules_string - the text read from a .yar file
         """
-        if (compiled_rules_path is None and paths is None) or \
-                (compiled_rules_path is not None and paths is not None):
-            raise ValueError("one of compiled_rules_path or paths must be set")
-
-        if callback is not None:
-            if not hasattr(callback, "__call__"):
-                raise TypeError("callback object not callable")
-            self._callback = YR_CALLBACK_FUNC(callback)
-        else:
-            self._callback = YR_CALLBACK_FUNC(self._callback)
+        if compiled_rules_path is not None and len(paths) != 0:
+            raise ValueError("one of compiled_rules_path, paths must be set")
 
         self._error_reports = []
         if report_function is not None:
@@ -183,122 +236,58 @@ class Rules():
         else:
             self._error_report_function = YR_REPORT_FUNC(self._error_report)
 
-        # Load or compile rules.
+        self._rules_dict = None
         self._rules = POINTER(YR_RULES)()
         if compiled_rules_path is not None:
-            self._load_compiled_rules(compiled_rules_path, externals)
+            # Load a compiled rules file.
+            result = yr_rules_load(compiled_rules_path, byref(self._rules))
+            if result != ERROR_SUCCESS:
+                raise Exception("Error loading compiled rules")
+
+            for k, value in externals.items():
+                if type(v) in INT_TYPES:
+                    yr_rules_define_integer_variable(self._rules, k, v)
+                elif type(v) is bool:
+                    yr_rules_define_boolean_variable(self._rules, k, v)
+                elif type(v) is str:
+                    yr_rules_define_string_variable(self._rules, k, v)
+                else:
+                    raise TypeError(\
+                        "External values must be types int, long, bool or str")
         else:
+            # Compile the rules from source.
             compiler = Compiler(externals, self._error_report_function)
             for namespace, path in paths.items():
                 compiler.compile_file(path, namespace=namespace)
             for namespace, filename, rule_string in strings:
-                compiler.compile_string(string, namespace=namespace)
+                compiler.compile_string(rule_string, namespace=namespace)
             compiler.get_rules(self._rules)
-
-        print("\n")
-        print(self)
-
-    def _load_compiled_rules(self, compiled_rules_path, externals):
-        result = yr_rules_load(compiled_rules_path, byref(self._rules))
-        if result != ERROR_SUCCESS:
-            raise Exception("error loading compiled rules")
-
-        for key, value in externals.items():
-            if type(value) in INT_TYPES:
-                yr_rules_define_integer_variable(self._rules, key, value)
-            elif type(value) is bool:
-                yr_rules_define_boolean_variable(self._rules, key, value)
-            elif type(value) is str:
-                yr_rules_define_string_variable(self._rules, key, value)
-            else:
-                raise TypeError(\
-                    "External values must be of type int, long, bool or str")
-
-    def _callback(self, message, rule, data):
-        # TODO - look at 1.7 here... need to consider match context, etc.
-        if message == CALLBACK_MSG_RULE_MATCHING:
-            print("Rules._callback - rule matches: %s" % rule)
-            print("                  %s" % Rule(rule))
-        elif message == CALLBACK_MSG_RULE_NOT_MATCHING:
-            pass
-        elif message == CALLBACK_MSG_SCAN_FINISHED:
-            print("Rules._callback - scan finished")
-        else:
-            raise ValueError("unknown callback message (%d)" % message)
-        return CALLBACK_CONTINUE
 
     def _error_report(self, error_level, filename, line_number, error_message):
         if not filename:
             filename = "<undefined yarfile>"
         self._error_reports.append((frombyte(filename), line_number,
                                     frombyte(error_message)))
-    
-        
-    def scan_file(self, file_path, user_data=None, fast_scan_mode=True,
-                        timeout=0):
-        #TODO - fast_scan_mode - what are the implications of this?
-        return yr_rules_scan_file(self._rules,
-                                    file_path,
-                                    self._callback,
-                                    user_data,
-                                    fast_scan_mode,
-                                    timeout)
-
-    def scan_mem(self, buffer, user_data=None, fast_scan_mode=True,
-                        timeout=0):
-        return yr_rules_scan_mem(self._rules,
-                                    buffer,
-                                    len(buffer),
-                                    self._callback,
-                                    user_data,
-                                    fast_scan_mode,
-                                    timeout)
-
-    def scan_proc(self, pid, user_data=None, fast_scan_mode=True,
-                        timeout=-0):
-        return yr_rules_scan_proc(self._rules,
-                                    pid,
-                                    self._callback,
-                                    user_data,
-                                    fast_scan_mode,
-                                    timeout)
-
-    def _error_report(self, error_level, filename, line_number, message):
-        if not filename:
-            filename = "<undefined yarfile>"
-        self._error_reports.append((frombyte(filename), line_number,
-                                    frombyte(message)))
-
-
-    def __str__(self):
-        #TODO - see how the yara-ctypes 1.7 implemented this.
-        return "<Rules.__str__() - TODO>"
-
-    """
-    def __str__(self):
-        return "Rules + %s" % "\n      + ".join([a[0] for a in self._strings])
 
     @property
-    def context(self):
-        ident = threading.current_thread().ident
-        c = self._contexts.get(ident, None)
-        if c is None:
-                c = RuleContext(*self._context_args)
-                self._contexts[ident] = c
-        return c
+    def rules(self):
+        if self._rules_dict is None:
+            self._rules_dict = {}
+            rule = self._rules.contents.rules_list_head
+            while not RULE_IS_NULL(rule.contents.g_flags):
+                r = Rule(rule)
+                self._rules_dict[r.ns] = r
+                rule = cast(addressof(rule.contents) + sizeof(YR_RULE),
+                            POINTER(YR_RULE))
+        return self._rules_dict
+    
+    def __str__(self):
+        return "Rules + %s" % \
+                    ("\n    + ".join([r.ns for r in self.rules.values()]))
 
-    def free(self):
-        ident = threading.current_thread().ident
-        c = self._contexts.pop(ident, None)
-        if c is not None:
-            c.free()
-
-    def weight(self):
-        return self.context.weight()
-    """
 
     def match_path(self, filepath, externals={}, callback=None):
-        """Match a filepath against the compiled rules
+        """Match a filepath against the compiled rules.
         Required argument:
            filepath - filepath to match against
 
@@ -318,9 +307,10 @@ class Rules():
 
         Return a dictionary of {"namespace":[match1,match2,...]}
         """
-        return self.context.match(yr_scan_file, filepath,
-                                  externals=externals,
-                                  callback=callback)
+        yara_callback = YaraCallback(callback=callback)
+        yr_rules_scan_file(self._rules, filepath, YR_CALLBACK_FUNC(yara_callback),
+                            user_data=None, fast_scan_mode=True, timeout=0)
+        return yara_callback.matches
 
     def match_data(self, data, externals={}, callback=None):
         """Match data against the compiled rules
@@ -343,9 +333,11 @@ class Rules():
 
         Return a dictionary of {"namespace":[match1,match2,...]}
         """
-        return self.context.match(yr_scan_mem, data, len(data),
-                            externals=externals,
-                            callback=callback)
+        yara_callback = YaraCallback(callback=callback)
+        yr_rules_scan_mem(self._rules, data, len(data), YR_CALLBACK_FUNC(yara_callback),
+                            user_data=None, fast_scan_mode=True, timeout=0)
+        return yara_callback.matches
+
 
     def match_proc(self, pid, externals={}, callback=None):
         """Match a process memory against the compiled rules
@@ -368,9 +360,10 @@ class Rules():
 
         Return a dictionary of {"namespace":[match1,match2,...]}
         """
-        return self.context.match(yr_scan_proc, pid,
-                            externals=externals,
-                            callback=callback)
+        yara_callback = YaraCallback(callback=callback)
+        yr_rules_scan_mem(self._rules, pid, YR_CALLBACK_FUNC(yara_callback),
+                            user_data=None, fast_scan_mode=True, timeout=0)
+        return yara_callback.matches
 
     def _match(self, fnc, *args, **kwargs):
         externals = kwargs.get("externals", {})
@@ -392,7 +385,6 @@ class Rules():
         self._matches = {}
         self._callback_error = None
         self._match_callback = callback
-
 
 
     def match(self, filepath=None, pid=None, data=None, **match_kwargs):
@@ -425,7 +417,7 @@ class Rules():
         elif data is not None:
             return self.match_data(data, **match_kwargs)
         else:
-            raise Exception("matche() missing a required argument")
+            raise Exception("match() missing a required argument")
 
 
 YARA_RULES_ROOT = os.environ.get('YARA_RULES',

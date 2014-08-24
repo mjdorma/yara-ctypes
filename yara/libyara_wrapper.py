@@ -213,10 +213,10 @@ def STRING_IS_NULL(x):
     return x and x.g_flags & STRING_GFLAGS_NULL
 
 def STRING_FITS_IN_ATOM(x):
-    return x and x.g_flags & STRING_GFLAGS_FITS_IN_ATOM
+    return x.contents.g_flags & STRING_GFLAGS_FITS_IN_ATOM
 
 def STRING_FOUND(x):
-    return x and x.g_flags & x[yr_get_tidx()].tail != None
+    return x.contents.matches[yr_get_tidx()].tail != None
 
 RULE_TFLAGS_MATCH                = 0x01
 
@@ -257,6 +257,10 @@ def DECLARE_REFERENCE(arg_type, arg_name):
     ReferenceUnion._fields_ = [(arg_name, arg_type),
                               ('_%s' % arg_name, c_int64)]
     return ReferenceUnion
+
+#define STRING_MATCHES(x) (x->matches[yr_get_tidx()])
+def STRING_MATCHES(x):
+    return x.matches[yr_get_tidx()]
 
 
 """
@@ -348,12 +352,13 @@ typedef struct _YR_MATCH
 class _YR_MATCH_UNION(Union):
     pass
 _YR_MATCH_UNION._fields_ = [
-            ('data', c_void_p),
+            ('data', POINTER(c_uint8)),
             ('chain_length', c_int32),
             ]
 
 class YR_MATCH(Structure):
     pass
+YR_MATCH._pack_ = 1
 YR_MATCH._anonymous_ = ("u",)
 YR_MATCH._fields_ = [
             ('offset', c_int64),
@@ -415,11 +420,11 @@ typedef struct _YR_MATCHES
 class YR_MATCHES(Structure):
     pass
 YR_MATCHES._pack_ = 1
-YR_MATCHES._anonymous_ = ("u",)
+YR_MATCHES._anonymous_ = ("_h", "_t")
 YR_MATCHES._fields_ = [
             ('count', c_uint32),
-            ('u', DECLARE_REFERENCE(c_void_p, 'identifier')),
-            ('u', DECLARE_REFERENCE(c_void_p, 'string'))
+            ('_h', DECLARE_REFERENCE(POINTER(YR_MATCH), 'head')),
+            ('_t', DECLARE_REFERENCE(POINTER(YR_MATCH), 'tail'))
             ]
 
 """
@@ -480,23 +485,17 @@ typedef struct _YR_RULE
 """
 class YR_RULE(Structure):
     pass
-#YR_RULE._anonymous_ = ('_i', '_t', '_m', '_s', '_n')
+YR_RULE._anonymous_ = ('_i', '_t', '_m', '_s', '_n')
 YR_RULE._pack_ = 1
 YR_RULE._fields_ = [
             ('g_flags', c_int32),
             ('t_flags', c_int32 * MAX_THREADS),
 
-            ('identifier', POINTER(c_char)),
-            ('tags', POINTER(c_char)),
-            ('metas', POINTER(YR_META)),
-            ('strings', POINTER(YR_STRING)),
-            ('ns', POINTER(YR_NAMESPACE)),
-            #TODO - try to restore the following
-            #('_i', DECLARE_REFERENCE(POINTER(c_char), 'identifier')),
-            #('_t', DECLARE_REFERENCE(POINTER(c_char), 'tags')),
-            #('_m', DECLARE_REFERENCE(POINTER(YR_META), 'metas')),
-            #('_s', DECLARE_REFERENCE(POINTER(YR_STRING), 'strings')),
-            #('_n', DECLARE_REFERENCE(POINTER(YR_NAMESPACE), 'ns')),
+            ('_i', DECLARE_REFERENCE(POINTER(c_char), 'identifier')),
+            ('_t', DECLARE_REFERENCE(POINTER(c_char), 'tags')),
+            ('_m', DECLARE_REFERENCE(POINTER(YR_META), 'metas')),
+            ('_s', DECLARE_REFERENCE(POINTER(YR_STRING), 'strings')),
+            ('_n', DECLARE_REFERENCE(POINTER(YR_NAMESPACE), 'ns')),
             ]
 
 
@@ -706,10 +705,9 @@ def error_report_function(error_level,
                 (filename, line_number, error_level, error_message))
 error_report_function = YR_REPORT_FUNC(error_report_function)
 
-
-#FIXME - hmmm... jmp_buf inside this structure is problematic... cannot
-#        know at time of defining interface how big this is on different
-#        systems.
+#FIXME - at present, solving the variable size of jmpbuf by compiling
+#        a separate library. these probably should just be a patch to
+#        to the copies of libyara we ship with the ctypes version.
 class YR_COMPILER(Structure):
     pass
 YR_COMPILER._fields_ = [
@@ -1069,7 +1067,7 @@ def yr_rules_scan_file(rules, filename, callback, user_data,
         raise YaraCallbackError()
     elif ret != ERROR_SUCCESS:
         if ret == ERROR_COULD_NOT_OPEN_FILE:
-            raise YaraMatchError("Could not open file '%s'" % path)
+            raise YaraMatchError("Could not open file '%s'" % filename)
         elif ret == ERROR_COULD_NOT_MAP_FILE:
             raise YaraMatchError("Could not map file '%s'" % path)
         elif ret == ERROR_ZERO_LENGTH_FILE:

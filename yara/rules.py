@@ -119,30 +119,36 @@ class Rule():
         # Process the tag string array.
         self.tags = []
         tag = rule.contents.tags
-        while tag.contents:
-            t = frombyte(string_at(tag))
-            self.tags.append(t)
-            tag = cast(addressof(tag.contents) + len(t) + 1, POINTER(c_char))
+        # Check that tag is not NULL.
+        if tag:
+            # Not NULL - iterate through contents.
+            while tag.contents:
+                t = frombyte(string_at(tag))
+                self.tags.append(t)
+                tag = cast(addressof(tag.contents) + len(t) + 1, POINTER(c_char))
 
         # Process rule meta.
         self.metas = {}
         meta = rule.contents.metas
-        while meta.contents:
-            if meta.contents.type == META_TYPE_NULL:
-                # End of list.
-                break
-            elif meta.contents.type == META_TYPE_INTEGER:
-                self.metas[frombyte(string_at(meta.contents.identifier))] = \
-                        int(meta.contents.integer)
-            elif meta.contents.type == META_TYPE_STRING:
-                self.metas[frombyte(string_at(meta.contents.identifier))] = \
-                        frombyte(string_at(meta.contents.string))
-            elif meta.contents.type == META_TYPE_BOOLEAN:
-                self.metas[frombyte(string_at(meta.contents.identifier))] = \
-                        bool(meta.contents.integer)
-            else:
-                raise ValueError("unknown meta type (type %d)" % meta.contents.type)
-            meta = cast(addressof(meta.contents) + sizeof(YR_META), POINTER(YR_META))
+        # Check that meta is not NULL.
+        if meta:
+            # Not NULL - iterate through contents.
+            while meta.contents:
+                if meta.contents.type == META_TYPE_NULL:
+                    # End of list.
+                    break
+                elif meta.contents.type == META_TYPE_INTEGER:
+                    self.metas[frombyte(string_at(meta.contents.identifier))] = \
+                            int(meta.contents.integer)
+                elif meta.contents.type == META_TYPE_STRING:
+                    self.metas[frombyte(string_at(meta.contents.identifier))] = \
+                            frombyte(string_at(meta.contents.string))
+                elif meta.contents.type == META_TYPE_BOOLEAN:
+                    self.metas[frombyte(string_at(meta.contents.identifier))] = \
+                            bool(meta.contents.integer)
+                else:
+                    raise ValueError("unknown meta type (type %d)" % meta.contents.type)
+                meta = cast(addressof(meta.contents) + sizeof(YR_META), POINTER(YR_META))
 
         # Process rule strings.
         self._process_strings(rule)
@@ -152,25 +158,33 @@ class Rule():
         # Process rule strings.
         self.strings = {}
         strings = rule.contents.strings
-        while not STRING_IS_NULL(strings.contents):
-            self.strings[frombyte(string_at(strings.contents.identifier))] = \
-                    frombyte(string_at(strings.contents.string))
-            strings = \
-                cast(addressof(strings.contents) + sizeof(YR_STRING),POINTER(YR_STRING))
+        # Check that strings is not NULL.
+        if strings:
+            # Not NULL - iterate through contents.
+            while not STRING_IS_NULL(strings.contents):
+                self.strings[frombyte(string_at(strings.contents.identifier))] = \
+                        frombyte(string_at(strings.contents.string))
+                strings = \
+                    cast(addressof(strings.contents) + sizeof(YR_STRING),POINTER(YR_STRING))
 
     def __str__(self):
-        return """<%s '%s'
-            tags: %s
-            metas: %s
-            strings: %s
-            """ % (self.__name__,
+        return "<%s '%s'\n\ttags: %s\n\tmetas: %s\n\tstrings: %s\n>" % \
+               (self.__class__.__name__,
                 self.uid,
                 ", ".join(self.tags),
-                "\n\t\t".join(["%s: %s" % (k,v) for k,v in self.metas.items()]),
-                "\n\t\t".join(["%s: %s" % (k,v) for k,v in self.strings.items()]))
+                "\n\t".join(["%s: %s" % (k,v) for k,v in self.metas.items()]),
+                "\n\t".join(["%s: %s" % (k,v) for k,v in self.strings.items()]))
 
 
 class Match(Rule):
+
+    def __str__(self):
+        return "<%s '%s'\n\ttags: %s\n\tmetas: %s\n\tstrings: %s\n>" % \
+               (self.__class__.__name__,
+                self.uid,
+                ", ".join(self.tags),
+                "\n\t".join(["%s: %s" % (k,v) for k,v in self.metas.items()]),
+                "\n\t".join(["%s @ 0x%08x: %s" % (identifier,offset,match) for offset,identifier,match in self.strings]))
 
     def _process_strings(self, r):
         # Process rule strings.
@@ -181,7 +195,8 @@ class Match(Rule):
                 m = STRING_MATCHES(strings.contents).head
                 while m:
                     s = frombyte(string_at(m.contents.data, m.contents.length))
-                    self.strings.append((m.contents.offset, r.contents.identifier, s))
+                    i = frombyte(string_at(r.contents.identifier))
+                    self.strings.append((m.contents.offset, i, s))
                     m = m.contents.next
 
             strings = \
@@ -190,7 +205,6 @@ class Match(Rule):
     def get_matches(self):
         # TODO
         raise NotImplementedError("TODO - write this")
-
 
 
 class Rules():
@@ -213,7 +227,7 @@ class Rules():
                              directives. 
             defines        - key:value defines for the preprocessor.  Sub in 
                              strings or macros defined in your rules files.
-            strings        - [(namespace, filename, rules_string),...]
+            strings        - [(namespace, rules_string),...]
             externals      - define boolean, integer, or string variables
                              {var:val,...}
             fast_match     - enable fast matching in the YARA context
@@ -222,7 +236,6 @@ class Rules():
         Note:
             namespace - defines which namespace we're building our rules under
             rules_path - path to the .yar file
-            filename  - filename which the rules_string came from
             rules_string - the text read from a .yar file
         """
         if compiled_rules_path is not None and len(paths) != 0:
@@ -259,7 +272,14 @@ class Rules():
             compiler = Compiler(externals, self._error_report_function)
             for namespace, path in paths.items():
                 compiler.compile_file(path, namespace=namespace)
-            for namespace, filename, rule_string in strings:
+            # TODO: Yara 1.7 had namespace, filename, rule_string whereas
+            #       YR_RULE in yara 2 is not aware of filename. It would
+            #       be good confirm this filename is now irrelevant here.
+            #       Note that the documentation for this class has already
+            #       been updated.
+            #for namespace, filename, rule_string in strings:
+            pprint.pprint(strings)
+            for namespace, rule_string in strings:
                 compiler.compile_string(rule_string, namespace=namespace)
             compiler.get_rules(self._rules)
 

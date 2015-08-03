@@ -7,6 +7,8 @@ from threading import Thread
 
 from yara import Rules
 import yara
+
+import pprint
 #TODO
 #from yara.libyara_wrapper import yr_malloc_count
 #from yara.libyara_wrapper import yr_free_count
@@ -89,7 +91,7 @@ class TestRulesMemoryLeakHunt(unittest.TestCase):
 
 
 class TestYaraCompile(unittest.TestCase):
-    """test yara compile interface"""
+    "Test yara compile interface."
 
     #TODO - test setting custom callback
     #TODO - test setting custom error report function
@@ -99,13 +101,13 @@ class TestYaraCompile(unittest.TestCase):
         self.assertEqual(res[0].identifier, 'TestMeta')
 
     def test_compile_filepath(self):
-        """compile filepath"""
+        "Compile filepath."
         filepath = os.path.join(RULES_ROOT, 'meta.yar')
         rule = yara.compile(filepath=filepath)
         self.assert_scan(rule)
 
     def test_compile_source(self):
-        """compile source"""
+        "Compile source."
         filepath = os.path.join(RULES_ROOT, 'meta.yar')
         with open(filepath, 'rb') as f:
             source = f.read()
@@ -113,20 +115,20 @@ class TestYaraCompile(unittest.TestCase):
         self.assert_scan(rule)
 
     def test_compile_fileobj(self):
-        """compile fileobj"""
+        "Compile fileobj."
         filepath = os.path.join(RULES_ROOT, 'meta.yar')
         with open(filepath, 'rb') as f:
             rule = yara.compile(fileobj=f)
         self.assert_scan(rule)
 
     def test_compile_filepaths(self):
-        """compile filepaths"""
+        "Compile filepaths."
         filepath = os.path.join(RULES_ROOT, 'meta.yar')
         rule = yara.compile(filepaths=dict(test_ns=filepath))
         self.assert_scan(rule)
 
     def test_compile_sources(self):
-        """compile sources"""
+        "Compile sources."
         filepath = os.path.join(RULES_ROOT, 'meta.yar')
         with open(filepath, 'rb') as f:
             source = f.read()
@@ -159,10 +161,31 @@ class TestYaraBuildNameSpacedRules(unittest.TestCase):
 
 
 class TestStringsParam(unittest.TestCase):
-    """check for consistent behaviour in rules creation from strings"""
+    "Check for consistent behaviour in rules creation from strings."
 
-    def test_filename_association(self):
-        """test filename is associated with a rule"""
+    def test_valid_rule(self):
+        "Test filename is associated with a rule."
+        source = """
+rule Dummy
+{
+    strings:
+        $a = "a"
+    condition:
+        $a
+}
+"""
+        rules = yara.Rules(strings=[('main', source),])
+        self.assertIn("main", rules.rules)
+        self.assertEquals(rules.rules["main"].ns, "main")
+        self.assertEquals(rules.rules["main"].identifier, "Dummy")
+        self.assertEquals(rules.rules["main"].uid, "main.Dummy")
+
+        res = rules.match_data("abc")
+        self.assertEquals(len(res), 1)
+        self.assertEquals(res[0].strings, [(0, "Dummy", "a")])
+
+    def test_broken_rule(self):
+        "Test filename is associated with a rule."
         source = """
 rule Broken 
 {
@@ -170,15 +193,9 @@ rule Broken
         true
 }
 """
-        rules = yara.Rules(strings=[('main', 'myfile.yar', source),])
-        try:
-            res = rules.match_data("aaa")
-        except yara.YaraSyntaxError as err:
-            f, l, e = err.errors[0]            
-            self.assertEqual(f, 'myfile.yar')
-            self.assertEqual(l, 5)
-        else:
-            self.fail("expected SyntaxError")
+        with self.assertRaises(yara.YaraSyntaxError) as cm:
+            rules = yara.Rules(strings=[('main', source),])
+        self.assertEquals(cm.exception.error_line, 5)
 
 
 class TestPrivateRule(unittest.TestCase):

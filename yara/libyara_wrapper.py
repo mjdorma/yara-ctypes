@@ -701,6 +701,7 @@ def error_report_function(error_level,
                             error_message):
     if not filename:
         filename = "??"
+    print("--------------- error report function ---------------")
     print("%s:%s: (%d) %s" % \
                 (filename, line_number, error_level, error_message))
 error_report_function = YR_REPORT_FUNC(error_report_function)
@@ -823,13 +824,25 @@ os.environ['PATH'] = tmp
 
 
 # Error handling sweetness.
-class YaraSyntaxError(Exception):
+# yara-python uses YaraError for most exceptions. Subclass base class for
+# compatability with yara-python while providing finer granularity.
+class YaraError(Exception):
+    def __init__(self, message, compiler, **kwargs):
+        super(YaraError, self).__init__(message, compiler, **kwargs)
+        self.error_line = compiler.contents.last_error_line
+        self.error = compiler.contents.last_error
     pass
 
-class YaraCallbackError(Exception):
+class YaraTimeoutError(Exception):
     pass
 
-class YaraMatchError(Exception):
+class YaraSyntaxError(YaraError):
+    pass
+
+class YaraCallbackError(YaraError):
+    pass
+
+class YaraMatchError(YaraError):
     pass
 
 
@@ -920,10 +933,20 @@ libyaradll.yr_compiler_add_string.restype = c_int
 libyaradll.yr_compiler_add_string.argtypes = \
         [POINTER(YR_COMPILER), c_char_p, c_char_p]
 def yr_compiler_add_string(compiler, rules_string, namespace_):
-    errors = libyaradll.yr_compiler_add_string(\
+    error = libyaradll.yr_compiler_add_string(\
             compiler, tobyte(rules_string), tobyte(namespace_))
-    if errors:
-        print("DEBUG> errors compiling string... TODO...")
+    if error:
+        if error == ERROR_INVALID_FILE:
+            raise YaraSyntaxError("invalid rules file \"%s\"" % TODO)
+        elif error == ERROR_CORRUPT_FILE:
+            raise YaraSyntaxError("corrupt rules file \"%s\"" % TODO)
+        elif error == ERROR_INSUFICIENT_MEMORY:
+            raise YaraSyntaxError(\
+                "insufficent memory adding string. bad syntax in rule?",
+                compiler)
+        else:
+            raise YaraError("internal error: %d" % error)
+
         #TODO - figure this out
         """
         error_line = context.contents.last_error_line

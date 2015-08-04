@@ -532,7 +532,7 @@ def compile(filepath=None, source=None, fileobj=None, filepaths=None,
     elif fileobj is not None:
         kwargs['strings'] = [('main', '<undef>', fileobj.read())]
     elif source is not None:
-        kwargs['strings'] = [('main', source)]
+        kwargs['strings'] = [('main', '<undef>', source)]
     elif sources is not None:
         kwargs['strings'] = [(a, '<undef>', b) for a, b in sources.items()]
     elif filepaths is not None:

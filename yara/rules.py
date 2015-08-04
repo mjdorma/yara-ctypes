@@ -227,7 +227,7 @@ class Rules():
                              directives. 
             defines        - key:value defines for the preprocessor.  Sub in 
                              strings or macros defined in your rules files.
-            strings        - [(namespace, rules_string),...]
+            strings        - [(namespace, filename, rules_string),...]
             externals      - define boolean, integer, or string variables
                              {var:val,...}
             fast_match     - enable fast matching in the YARA context
@@ -236,6 +236,7 @@ class Rules():
         Note:
             namespace - defines which namespace we're building our rules under
             rules_path - path to the .yar file
+            filename - filename which the rules_string came from
             rules_string - the text read from a .yar file
         """
         if compiled_rules_path is not None and len(paths) != 0:
@@ -272,15 +273,11 @@ class Rules():
             compiler = Compiler(externals, self._error_report_function)
             for namespace, path in paths.items():
                 compiler.compile_file(path, namespace=namespace)
-            # TODO: Yara 1.7 had namespace, filename, rule_string whereas
-            #       YR_RULE in yara 2 is not aware of filename. It would
-            #       be good confirm this filename is now irrelevant here.
-            #       Note that the documentation for this class has already
-            #       been updated.
-            #for namespace, filename, rule_string in strings:
-            pprint.pprint(strings)
-            for namespace, rule_string in strings:
-                compiler.compile_string(rule_string, namespace=namespace)
+
+            for namespace, filename, rule_string in strings:
+                if filename is not None:
+                    ns = "%s.%s" % (namespace, filename.split(".yar")[0])
+                compiler.compile_string(rule_string, namespace=ns)
             compiler.get_rules(self._rules)
 
     def _error_report(self, error_level, filename, line_number, error_message):
@@ -535,7 +532,7 @@ def compile(filepath=None, source=None, fileobj=None, filepaths=None,
     elif fileobj is not None:
         kwargs['strings'] = [('main', '<undef>', fileobj.read())]
     elif source is not None:
-        kwargs['strings'] = [('main', '<undef>', source)]
+        kwargs['strings'] = [('main', source)]
     elif sources is not None:
         kwargs['strings'] = [(a, '<undef>', b) for a, b in sources.items()]
     elif filepaths is not None:

@@ -174,11 +174,12 @@ rule Dummy
         $a
 }
 """
-        rules = yara.Rules(strings=[('main', source),])
-        self.assertIn("main", rules.rules)
-        self.assertEquals(rules.rules["main"].ns, "main")
-        self.assertEquals(rules.rules["main"].identifier, "Dummy")
-        self.assertEquals(rules.rules["main"].uid, "main.Dummy")
+        rules = yara.Rules(strings=[("main", "myfile.yar", source),])
+        self.assertIn("main.myfile", rules.rules)
+        self.assertEquals(rules.rules["main.myfile"].ns, "main.myfile")
+        self.assertEquals(rules.rules["main.myfile"].identifier, "Dummy")
+        self.assertEquals(\
+                rules.rules["main.myfile"].uid, "main.myfile.Dummy")
 
         res = rules.match_data("abc")
         self.assertEquals(len(res), 1)
@@ -194,7 +195,7 @@ rule Broken
 }
 """
         with self.assertRaises(yara.YaraSyntaxError) as cm:
-            rules = yara.Rules(strings=[('main', source),])
+            rules = yara.Rules(strings=[('main', 'myfile.yar', source),])
         self.assertEquals(cm.exception.error_line, 5)
 
 

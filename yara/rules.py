@@ -275,9 +275,7 @@ class Rules():
                 compiler.compile_file(path, namespace=namespace)
 
             for namespace, filename, rule_string in strings:
-                if filename is not None:
-                    ns = "%s.%s" % (namespace, filename.split(".yar")[0])
-                compiler.compile_string(rule_string, namespace=ns)
+                compiler.compile_string(rule_string, namespace=namespace)
             compiler.get_rules(self._rules)
 
     def _error_report(self, error_level, filename, line_number, error_message):

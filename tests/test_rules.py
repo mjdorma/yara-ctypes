@@ -175,11 +175,11 @@ rule Dummy
 }
 """
         rules = yara.Rules(strings=[("main", "myfile.yar", source),])
-        self.assertIn("main.myfile", rules.rules)
-        self.assertEquals(rules.rules["main.myfile"].ns, "main.myfile")
-        self.assertEquals(rules.rules["main.myfile"].identifier, "Dummy")
+        self.assertIn("main", rules.rules)
+        self.assertEquals(rules.rules["main"].ns, "main")
+        self.assertEquals(rules.rules["main"].identifier, "Dummy")
         self.assertEquals(\
-                rules.rules["main.myfile"].uid, "main.myfile.Dummy")
+                rules.rules["main"].uid, "main.Dummy")
 
         res = rules.match_data("abc")
         self.assertEquals(len(res), 1)
@@ -251,9 +251,10 @@ rule TestMeta
 """
         rules = yara.compile(source=source)
         res = rules.match_data("mocking bird")
-        self.assertTrue('main' in res)
-        self.assertEqual(len(res['main']), 1)
-        meta = res['main'][0]['meta']
+        self.assertEqual(len(res), 1)
+        match = res[0]
+        self.assertEqual(match.ns, "main")
+        meta = match.metas
         self.assertEqual(meta['excitement'], 10)
         self.assertEqual(meta['signature'], "this is my sig")
         self.assertEqual(meta['want'], True)

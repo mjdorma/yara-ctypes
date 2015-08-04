@@ -32,16 +32,16 @@ class Compiler:
         self._compiler.allow_includes = True
 
         # Process the externals.
-        for key, value in externals.items():
-            if type(value) in INT_TYPES:
-                yr_compiler_define_integer_variable(self._compiler, key, value)
-            elif type(value) is bool:
-                yr_compiler_define_boolean_variable(self._compiler, key, value)
-            elif type(value) is str:
-                yr_compiler_define_string_variable(self._compiler, key, value)
+        for k, v in externals.items():
+            if type(v) in INT_TYPES:
+                yr_compiler_define_integer_variable(self._compiler, k, v)
+            elif type(v) is bool:
+                yr_compiler_define_boolean_variable(self._compiler, k, v)
+            elif type(v) is str:
+                yr_compiler_define_string_variable(self._compiler, k, v)
             else:
-                raise TypeError(\
-                    "External values must be of type int, long, bool or str")
+                msg = "External values must by type int, long, bool or str"
+                raise TypeError(msg)
 
         # Set error report function.
         if not hasattr(error_report_function, "__call__"):
@@ -190,17 +190,20 @@ class Match(Rule):
         # Process rule strings.
         self.strings = []
         strings = r.contents.strings
-        while not STRING_IS_NULL(strings.contents):
-            if STRING_FOUND(strings):
-                m = STRING_MATCHES(strings.contents).head
-                while m:
-                    s = frombyte(string_at(m.contents.data, m.contents.length))
-                    i = frombyte(string_at(r.contents.identifier))
-                    self.strings.append((m.contents.offset, i, s))
-                    m = m.contents.next
+        # Check that strings is not NULL.
+        if strings:
+            # Not NULL - iterate through contents.
+            while not STRING_IS_NULL(strings.contents):
+                if STRING_FOUND(strings):
+                    m = STRING_MATCHES(strings.contents).head
+                    while m:
+                        s = frombyte(string_at(m.contents.data, m.contents.length))
+                        i = frombyte(string_at(r.contents.identifier))
+                        self.strings.append((m.contents.offset, i, s))
+                        m = m.contents.next
 
-            strings = \
-                cast(addressof(strings.contents) + sizeof(YR_STRING),POINTER(YR_STRING))
+                strings = \
+                    cast(addressof(strings.contents) + sizeof(YR_STRING),POINTER(YR_STRING))
 
     def get_matches(self):
         # TODO
@@ -214,7 +217,7 @@ class Rules():
                  paths={},
                  externals={},
                  #defines={},
-                 #include_path=[],
+                 include_path=[],
                  strings=[],
                  fast_match=False,
                  report_function=None,
@@ -258,7 +261,7 @@ class Rules():
             if result != ERROR_SUCCESS:
                 raise Exception("Error loading compiled rules")
 
-            for k, value in externals.items():
+            for k, v in externals.items():
                 if type(v) in INT_TYPES:
                     yr_rules_define_integer_variable(self._rules, k, v)
                 elif type(v) is bool:

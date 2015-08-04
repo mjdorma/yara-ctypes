@@ -222,11 +222,13 @@ rule TestRule
 """
         rules = yara.compile(source=source)
         res = rules.match_data("private rule ftw")
-        self.assertTrue('main' in res)
-        self.assertEqual(len(res['main']), 1)
-        self.assertTrue(res['main'][0]['rule'], "TestRule")
+        self.assertEqual(len(res), 1)
+        match = res[0]
+        self.assertEqual(match.ns, "main")
+        self.assertTrue(match.identifier, "TestRule")
+
         res = rules.match_data("aaa")
-        self.assertTrue('main' not in res)
+        self.assertEqual(len(res), 0)
 
 
 class TestRuleMeta(unittest.TestCase):
@@ -267,7 +269,14 @@ rule TestMeta
 class TestRuleExternals(unittest.TestCase):
     """ test rules inputs and outputs"""    
 
-    def aatest_external_int(self):
+    #TODO - is the following valid and, if so, should it be tested?
+    """
+    rules = yara.compile(source=source, externals=dict(ext_var=10))
+    res = rules.match_data("aaa", externals=dict(ext_var=1))
+    """
+
+
+    def test_external_int(self):
         """confirm external int works """
         source = """
 rule TestExtern
@@ -275,15 +284,20 @@ rule TestExtern
     condition:
         ext_var == 10
 }"""
-        rules = yara.compile(source=source, externals=dict(ext_var=10))
+        rules = yara.compile(source=source,
+                             externals=dict(ext_var=10))
         res = rules.match_data("aaa")
-        self.assertTrue('main' in res)
-        self.assertEqual(len(res['main']), 1)
-        self.assertTrue(res['main'][0]['rule'], "TestExtern")
-        res = rules.match_data("aaa", externals=dict(ext_var=1))
-        self.assertTrue('main' not in res)
+        self.assertEqual(len(res), 1)
+        match = res[0]
+        self.assertEqual(match.ns, "main")
+        self.assertTrue(match.identifier, "TestExtern")
 
-    def aatest_external_string(self):
+        rules = yara.compile(source=source,
+                             externals=dict(ext_var=1))
+        res = rules.match_data("aaa")
+        self.assertEqual(len(res), 0)
+
+    def test_external_string(self):
         """confirm external string works """
         source = """
 rule TestExtern
@@ -291,17 +305,20 @@ rule TestExtern
     condition:
         ext_var contains "test"
 }"""
-        rules = yara.compile(source=source, externals=dict(ext_var="my test"))
+        rules = yara.compile(source=source,
+                             externals=dict(ext_var="my test"))
         res = rules.match_data("aaa")
-        self.assertTrue('main' in res, 
-                    msg='Failed to set ext_var to "my test"')
-        self.assertEqual(len(res['main']), 1)
-        self.assertTrue(res['main'][0]['rule'], "TestExtern")
-        res = rules.match_data("aaa", externals=dict(ext_var="tset ym"))
-        self.assertTrue('main' not in res, 
-                    msg='Failed to set ext_var to "tset ym"')
+        self.assertEqual(len(res), 1)
+        match = res[0]
+        self.assertEqual(match.ns, "main")
+        self.assertTrue(match.identifier, "TestExtern")
 
-    def aatest_external_bool(self):
+        rules = yara.compile(source=source,
+                             externals=dict(ext_var="tset ym"))
+        res = rules.match_data("aaa")
+        self.assertEqual(len(res), 0)
+
+    def test_external_bool(self):
         """confirm external bool works """
         source = """
 rule TestExtern
@@ -309,14 +326,18 @@ rule TestExtern
     condition:
         ext_var
 }"""
-        rules = yara.compile(source=source, externals=dict(ext_var=True))
+        rules = yara.compile(source=source,
+                             externals=dict(ext_var=True))
         res = rules.match_data("aaa")
-        self.assertTrue('main' in res, msg='Failed to set ext_var to True')
-        self.assertEqual(len(res['main']), 1)
-        self.assertTrue(res['main'][0]['rule'], "TestExtern")
-        res = rules.match_data("aaa", externals=dict(ext_var=False))
-        self.assertTrue('main' not in res, 
-                    msg='Failed to set ext_var to False')
+        self.assertEqual(len(res), 1)
+        match = res[0]
+        self.assertEqual(match.ns, "main")
+        self.assertTrue(match.identifier, "TestExtern")
+
+        rules = yara.compile(source=source,
+                             externals=dict(ext_var=False))
+        res = rules.match_data("aaa")
+        self.assertEqual(len(res), 0)
 
 
 class TestComments(unittest.TestCase):

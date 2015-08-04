@@ -1024,10 +1024,10 @@ def yr_compiler_define_boolean_variable(compiler, identifier, value):
 #    const char* value);
 libyaradll.yr_compiler_define_string_variable.restype = c_int
 libyaradll.yr_compiler_define_string_variable.argtypes = \
-        [POINTER(YR_COMPILER), c_char_p, c_int64]
+        [POINTER(YR_COMPILER), c_char_p, c_char_p]
 def yr_compiler_define_string_variable(compiler, identifier, value):
     return libyaradll.yr_compiler_define_string_variable(\
-            compiler, tobyte(identifier), value)
+            compiler, tobyte(identifier), tobyte(value))
 
 
 #int yr_compiler_get_rules(
